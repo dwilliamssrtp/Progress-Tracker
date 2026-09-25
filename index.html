@@ -294,13 +294,17 @@
     items: {},
     trainee: null,
     roster: [],
-    admin: null,           // {accounts, trainees} once loaded
-    program: null,          // {phases, itemDefs, reviewerAssignments, accounts, trainees} once loaded
+    admin: null,           // {accounts, trainees, tracks} once loaded
+    program: null,          // {tracks, phases, itemDefs, reviewerAssignments, accounts, trainees} once loaded
+    programTrackFilter: '', // which Track's Key Objectives are shown/created in Manage Program
     expandedProgram: {},
     phaseDrafts: {},
     newItemDraft: {},
     newPhaseDraft: {title:'', tag:'', range:'', location:'', reporting:'', output:'', objective:''},
     newReviewerDraft: {},
+    newTrackDraft: {name:'', description:''},
+    trackDrafts: {},        // trackId -> {name, description} edit drafts
+    traineeTrackDrafts: {}, // traineeId -> pending track reassignment
     programError: '',
     expanded: {},
     drafts: {},
@@ -309,7 +313,7 @@
     offline: false,
     loginError: '',
     adminError: '',
-    newAcctDraft: {name:'', username:'', role:'Trainee', startDate:'', email:'', password:''}
+    newAcctDraft: {name:'', username:'', role:'Trainee', startDate:'', trackId:'', email:'', password:''}
   };
   var focusRestore = null;
   var itemDefsCache = {};
@@ -537,7 +541,8 @@
   function loadAdmin(){
     apiPost('listAccounts', {}).then(function(res){
       if(!res.ok){ if(res.error==='auth'){ clearAuth(); } state.adminError = res.error||''; render(); return; }
-      state.admin = { accounts: Array.isArray(res.accounts)?res.accounts:[], trainees: Array.isArray(res.trainees)?res.trainees:[] };
+      state.admin = { accounts: Array.isArray(res.accounts)?res.accounts:[], trainees: Array.isArray(res.trainees)?res.trainees:[], tracks: Array.isArray(res.tracks)?res.tracks:[] };
+      if(!state.newAcctDraft.trackId && state.admin.tracks.length){ state.newAcctDraft.trackId = state.admin.tracks[0].id; }
       state.adminError=''; render();
     });
   }
@@ -551,12 +556,17 @@
     apiPost('listProgram', {}).then(function(res){
       if(!res.ok){ if(res.error==='auth'){ clearAuth(); } state.programError = res.error||''; render(); return; }
       state.program = {
+        tracks: Array.isArray(res.tracks)?res.tracks:[],
         phases: (Array.isArray(res.phases)?res.phases:[]).slice().sort(function(a,b){ return (a.order||0)-(b.order||0); }),
         itemDefs: Array.isArray(res.itemDefs)?res.itemDefs:[],
         reviewerAssignments: Array.isArray(res.reviewerAssignments)?res.reviewerAssignments:[],
         accounts: Array.isArray(res.accounts)?res.accounts:[],
         trainees: Array.isArray(res.trainees)?res.trainees:[]
       };
+      if((!state.programTrackFilter || !state.program.tracks.some(function(t){ return t.id===state.programTrackFilter; })) && state.program.tracks.length){
+        state.programTrackFilter = state.program.tracks[0].id;
+      }
+      if(!state.newPhaseDraft.trackId) state.newPhaseDraft.trackId = state.programTrackFilter;
       state.programError=''; render();
     });
   }
@@ -738,6 +748,7 @@
       var pct = t.total ? Math.round(t.approved/t.total*100) : 0;
       out += '<button class="roster-card" data-open-trainee="'+esc(t.traineeId)+'">' +
         '<div class="name">'+esc(t.name||'Unnamed')+'</div>' +
+        (t.trackName ? '<div class="start" style="color:var(--navy);">'+esc(t.trackName)+'</div>' : '') +
         '<div class="start">'+(t.startDate?('Started '+esc(t.startDate)):'Start date not set')+'</div>' +
         '<div class="bar"><i style="width:'+pct+'%"></i></div>' +
         '<div class="stats"><span class="tabular">'+t.approved+' / '+t.total+' approved</span>' +
@@ -892,16 +903,20 @@
     var out = '';
 
     out += '<div class="admin-section"><h2>Accounts</h2><div class="table-wrap"><table class="accounts"><thead><tr>' +
-      '<th>Name</th><th>Username</th><th>Role</th><th>Trainee</th><th>Email</th><th>Status</th><th></th>' +
+      '<th>Name</th><th>Username</th><th>Role</th><th>Employee</th><th>Track</th><th>Email</th><th>Status</th><th></th>' +
       '</tr></thead><tbody>';
-    var traineeNameById = {};
-    (state.admin.trainees||[]).forEach(function(t){ traineeNameById[t.TraineeId] = t.Name; });
+    var traineeNameById = {}, traineeTrackIdById = {};
+    (state.admin.trainees||[]).forEach(function(t){ traineeNameById[t.TraineeId] = t.Name; traineeTrackIdById[t.TraineeId] = t.TrackId; });
+    var trackNameById = {};
+    (state.admin.tracks||[]).forEach(function(t){ trackNameById[t.id] = t.name; });
     (state.admin.accounts||[]).forEach(function(a){
+      var trackName = a.traineeId ? (trackNameById[traineeTrackIdById[a.traineeId]] || '') : '';
       out += '<tr>' +
         '<td>'+esc(a.name)+'</td>' +
         '<td class="mono">'+esc(a.username)+'</td>' +
         '<td>'+esc(a.role)+'</td>' +
         '<td>'+(a.traineeId ? esc(traineeNameById[a.traineeId]||a.traineeId) : '—')+'</td>' +
+        '<td>'+(trackName ? esc(trackName) : '—')+'</td>' +
         '<td>'+esc(a.email||'—')+'</td>' +
         '<td><span class="pill active">active</span></td>' +
         '<td style="white-space:nowrap;">' +
@@ -912,6 +927,7 @@
     out += '</tbody></table></div></div>';
 
     var d = state.newAcctDraft;
+    var tracks = state.admin.tracks || [];
     out += '<div class="admin-section"><h2>Create account</h2>' +
       (state.adminError ? '<p class="error-text">'+esc(state.adminError)+'</p>' : '') +
       '<div class="create-form">' +
@@ -920,48 +936,107 @@
         '<div class="field-group"><label>Role</label><select id="newAcctRole" data-draft="role">' +
           ROLES.map(function(r){ return '<option value="'+r+'"'+(d.role===r?' selected':'')+'>'+r+'</option>'; }).join('') +
         '</select></div>' +
-        '<div class="field-group" id="newAcctStartWrap"><label>Trainee start date</label><input type="date" id="newAcctStart" data-draft="startDate" value="'+esc(d.startDate)+'"></div>' +
+        '<div class="field-group" id="newAcctStartWrap"><label>Employee start date</label><input type="date" id="newAcctStart" data-draft="startDate" value="'+esc(d.startDate)+'"></div>' +
+        '<div class="field-group" id="newAcctTrackWrap"><label>Track</label><select id="newAcctTrack" data-draft="trackId">' +
+          (tracks.length ? tracks.map(function(t){ return '<option value="'+esc(t.id)+'"'+(d.trackId===t.id?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('') : '<option value="">No tracks yet — add one in Manage Program</option>') +
+        '</select></div>' +
         '<div class="field-group"><label>Email (optional)</label><input type="email" id="newAcctEmail" data-draft="email" value="'+esc(d.email)+'"></div>' +
         '<div class="field-group"><label>Password</label><input type="text" id="newAcctPassword" data-draft="password" placeholder="min. 6 characters" value="'+esc(d.password)+'"></div>' +
         '<div class="field-group"><button class="btn btn-primary" id="createAcctBtn">Create account</button></div>' +
       '</div>' +
-      '<p class="hint">Choosing role <b>Trainee</b> creates a new trainee record too, and seeds their checklist automatically.</p>' +
+      '<p class="hint">Choosing role <b>Trainee</b> creates a new employee record on the selected Track too, and seeds their checklist from that Track\'s Key Objectives automatically.</p>' +
     '</div>';
 
     return out;
   }
 
-  /* ---------------- admin: manage program (Key Objectives, items, hierarchy) ---------------- */
+  /* ---------------- admin: manage program (Tracks, Key Objectives, items, hierarchy) ---------------- */
   function renderProgram(){
     if(!state.program){ return '<div class="hint">Loading program…</div>'; }
     var out = '';
+    if(state.programError){ out += '<p class="error-text" style="margin:0 0 12px;">'+esc(state.programError)+'</p>'; }
 
-    out += '<div class="admin-section"><h2>Key Objectives</h2>';
-    if(state.programError){ out += '<p class="error-text">'+esc(state.programError)+'</p>'; }
-    if(state.program.phases.length===0){ out += '<div class="hint">No Key Objectives yet — create one below.</div>'; }
-    state.program.phases.forEach(function(p){ out += renderProgramPhase(p); });
-    out += '</div>';
+    var tracks = state.program.tracks;
 
-    var np = state.newPhaseDraft;
-    out += '<div class="admin-section"><h2>Create Key Objective</h2>' +
-      '<div class="create-form">' +
-        '<div class="field-group"><label>Title</label><input type="text" data-newphase="title" value="'+esc(np.title)+'"></div>' +
-        '<div class="field-group"><label>Tag</label><input type="text" data-newphase="tag" placeholder="e.g. 1, 2A" value="'+esc(np.tag)+'"></div>' +
-        '<div class="field-group"><label>Timeframe</label><input type="text" data-newphase="range" placeholder="e.g. Months 1–3" value="'+esc(np.range)+'"></div>' +
-        '<div class="field-group"><label>Location</label><input type="text" data-newphase="location" value="'+esc(np.location)+'"></div>' +
-        '<div class="field-group"><label>Reports to</label><input type="text" data-newphase="reporting" value="'+esc(np.reporting)+'"></div>' +
-        '<div class="field-group"><label>Key output</label><input type="text" data-newphase="output" value="'+esc(np.output)+'"></div>' +
-        '<div class="field-group" style="grid-column:1/-1"><label>Description</label><textarea class="field-input" data-newphase="objective">'+esc(np.objective)+'</textarea></div>' +
-        '<div class="field-group"><button class="btn btn-primary" id="createPhaseBtn">Create Key Objective</button></div>' +
+    out += '<div class="admin-section"><h2>Tracks</h2>' +
+      '<p class="hint">A Track is a role or program — Engineer Trainee, Sales, Operations, whatever fits. Each Key Objective belongs to one Track, and an employee only ever sees the objectives on their own Track.</p>';
+    if(tracks.length===0){ out += '<div class="hint">No tracks yet — create one below.</div>'; }
+    tracks.forEach(function(t){ out += renderProgramTrack(t); });
+    var nt = state.newTrackDraft;
+    out += '<div class="inline-add-row" style="margin-top:10px;">' +
+        '<input type="text" data-newtrack="name" placeholder="Track name (e.g. Sales)" value="'+esc(nt.name)+'" style="min-width:180px;">' +
+        '<input type="text" data-newtrack="description" placeholder="Description (optional)" value="'+esc(nt.description)+'" style="flex:1; min-width:220px;">' +
+        '<button class="btn btn-primary btn-sm" id="createTrackBtn">Create track</button>' +
       '</div>' +
     '</div>';
 
+    var filterTrackId = state.programTrackFilter;
+    var currentTrack = tracks.filter(function(t){ return t.id===filterTrackId; })[0];
+    var phasesInTrack = state.program.phases.filter(function(p){ return p.trackId===filterTrackId; });
+
+    out += '<div class="admin-section"><h2>Key Objectives</h2>';
+    if(tracks.length===0){
+      out += '<div class="hint">Create a track above first.</div>';
+    } else {
+      out += '<div class="field-group" style="max-width:320px; margin-bottom:14px;"><label>Track</label><select id="programTrackSelect">' +
+          tracks.map(function(t){ return '<option value="'+esc(t.id)+'"'+(filterTrackId===t.id?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('') +
+        '</select></div>';
+      if(phasesInTrack.length===0){ out += '<div class="hint">No Key Objectives on this track yet — create one below.</div>'; }
+      phasesInTrack.forEach(function(p){ out += renderProgramPhase(p); });
+
+      var np = state.newPhaseDraft;
+      out += '<div class="program-sub"><h3>Create Key Objective'+(currentTrack?(' on '+esc(currentTrack.name)):'')+'</h3><div class="create-form">' +
+          '<div class="field-group"><label>Title</label><input type="text" data-newphase="title" value="'+esc(np.title)+'"></div>' +
+          '<div class="field-group"><label>Tag</label><input type="text" data-newphase="tag" placeholder="e.g. 1, 2A" value="'+esc(np.tag)+'"></div>' +
+          '<div class="field-group"><label>Timeframe</label><input type="text" data-newphase="range" placeholder="e.g. Months 1–3" value="'+esc(np.range)+'"></div>' +
+          '<div class="field-group"><label>Location</label><input type="text" data-newphase="location" value="'+esc(np.location)+'"></div>' +
+          '<div class="field-group"><label>Reports to</label><input type="text" data-newphase="reporting" value="'+esc(np.reporting)+'"></div>' +
+          '<div class="field-group"><label>Key output</label><input type="text" data-newphase="output" value="'+esc(np.output)+'"></div>' +
+          '<div class="field-group" style="grid-column:1/-1"><label>Description</label><textarea class="field-input" data-newphase="objective">'+esc(np.objective)+'</textarea></div>' +
+          '<div class="field-group"><button class="btn btn-primary" id="createPhaseBtn">Create Key Objective</button></div>' +
+        '</div></div>';
+    }
+    out += '</div>';
+
+    out += '<div class="admin-section"><h2>Employees &amp; Tracks</h2>';
+    var traineeAccts = state.program.trainees;
+    if(traineeAccts.length===0){ out += '<div class="hint">No employees yet.</div>'; }
+    else {
+      out += '<div class="table-wrap"><table class="accounts"><thead><tr><th>Name</th><th>Current Track</th><th>Reassign to</th><th></th></tr></thead><tbody>';
+      traineeAccts.forEach(function(t){
+        var currentTrackName = (tracks.filter(function(tr){ return tr.id===t.TrackId; })[0]||{}).name || '—';
+        var pending = state.traineeTrackDrafts[t.TraineeId] !== undefined ? state.traineeTrackDrafts[t.TraineeId] : t.TrackId;
+        out += '<tr><td>'+esc(t.Name)+'</td><td>'+esc(currentTrackName)+'</td>' +
+          '<td><select data-traineetrack="'+esc(t.TraineeId)+'">' +
+            tracks.map(function(tr){ return '<option value="'+esc(tr.id)+'"'+(pending===tr.id?' selected':'')+'>'+esc(tr.name)+'</option>'; }).join('') +
+          '</select></td>' +
+          '<td><button class="btn btn-ghost btn-sm" data-savetraineetrack="'+esc(t.TraineeId)+'">Save</button></td></tr>';
+      });
+      out += '</tbody></table></div>';
+    }
+    out += '</div>';
+
     return out;
+  }
+
+  function renderProgramTrack(t){
+    if(!state.trackDrafts[t.id]){ state.trackDrafts[t.id] = {name:t.name, description:t.description}; }
+    var d = state.trackDrafts[t.id];
+    return '<div class="program-phase"><div class="program-phase-body" style="border-top:none; padding-top:14px;">' +
+        '<div class="create-form">' +
+          '<div class="field-group"><label>Name</label><input type="text" data-trackfield="'+esc(t.id)+':name" value="'+esc(d.name)+'"></div>' +
+          '<div class="field-group" style="grid-column:span 2;"><label>Description</label><input type="text" data-trackfield="'+esc(t.id)+':description" value="'+esc(d.description)+'"></div>' +
+        '</div>' +
+        '<div class="action-row" style="margin-top:8px;">' +
+          '<button class="btn btn-primary btn-sm" data-savetrack="'+esc(t.id)+'">Save</button>' +
+          '<button class="btn btn-danger-outline btn-sm" data-deletetrack="'+esc(t.id)+'">Delete track</button>' +
+        '</div>' +
+      '</div></div>';
   }
 
   function renderProgramPhase(p){
     if(!state.phaseDrafts[p.id]){
-      state.phaseDrafts[p.id] = {title:p.title, tag:p.tag, range:p.range, location:p.location, reporting:p.reporting, output:p.output, objective:p.objective};
+      state.phaseDrafts[p.id] = {title:p.title, tag:p.tag, range:p.range, location:p.location, reporting:p.reporting, output:p.output, objective:p.objective, trackId:p.trackId};
     }
     var d = state.phaseDrafts[p.id];
     var isOpen = !!state.expandedProgram[p.id];
@@ -981,6 +1056,9 @@
       out += '<div class="program-sub"><h3>Details</h3><div class="create-form">' +
           '<div class="field-group"><label>Title</label><input type="text" data-phasefield="'+esc(p.id)+':title" value="'+esc(d.title)+'"></div>' +
           '<div class="field-group"><label>Tag</label><input type="text" data-phasefield="'+esc(p.id)+':tag" value="'+esc(d.tag)+'"></div>' +
+          '<div class="field-group"><label>Track</label><select data-phasefield="'+esc(p.id)+':trackId">' +
+            state.program.tracks.map(function(t){ return '<option value="'+esc(t.id)+'"'+(d.trackId===t.id?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('') +
+          '</select></div>' +
           '<div class="field-group"><label>Timeframe</label><input type="text" data-phasefield="'+esc(p.id)+':range" value="'+esc(d.range)+'"></div>' +
           '<div class="field-group"><label>Location</label><input type="text" data-phasefield="'+esc(p.id)+':location" value="'+esc(d.location)+'"></div>' +
           '<div class="field-group"><label>Reports to</label><input type="text" data-phasefield="'+esc(p.id)+':reporting" value="'+esc(d.reporting)+'"></div>' +
@@ -1201,8 +1279,13 @@
 
     var roleSel = document.getElementById('newAcctRole');
     var startWrap = document.getElementById('newAcctStartWrap');
+    var trackWrap = document.getElementById('newAcctTrackWrap');
     if(roleSel && startWrap){
-      var syncStartVisibility = function(){ startWrap.style.display = roleSel.value==='Trainee' ? '' : 'none'; };
+      var syncStartVisibility = function(){
+        var isTrainee = roleSel.value==='Trainee';
+        startWrap.style.display = isTrainee ? '' : 'none';
+        if(trackWrap) trackWrap.style.display = isTrainee ? '' : 'none';
+      };
       syncStartVisibility();
       roleSel.addEventListener('change', syncStartVisibility);
     }
@@ -1212,12 +1295,13 @@
         var d = state.newAcctDraft;
         var payload = {
           name: d.name.trim(), username: d.username.trim(), role: d.role,
-          email: d.email.trim(), password: d.password, startDate: d.startDate
+          email: d.email.trim(), password: d.password, startDate: d.startDate, trackId: d.trackId
         };
         apiPost('createAccount', payload).then(function(res){
           if(!res.ok){ state.adminError = res.error || 'Could not create account'; render(); return; }
           state.adminError = '';
-          state.newAcctDraft = {name:'', username:'', role:'Trainee', startDate:'', email:'', password:''};
+          var keepTrack = state.newAcctDraft.trackId;
+          state.newAcctDraft = {name:'', username:'', role:'Trainee', startDate:'', trackId:keepTrack, email:'', password:''};
           loadAdmin();
         });
       });
@@ -1237,18 +1321,20 @@
     });
 
     Array.prototype.forEach.call(document.querySelectorAll('[data-phasefield]'), function(el){
-      el.addEventListener('input', function(){
+      var sync = function(){
         var parts = el.getAttribute('data-phasefield').split(':');
         if(!state.phaseDrafts[parts[0]]) state.phaseDrafts[parts[0]] = {};
         state.phaseDrafts[parts[0]][parts[1]] = el.value;
-      });
+      };
+      el.addEventListener('input', sync);
+      el.addEventListener('change', sync);
     });
 
     Array.prototype.forEach.call(document.querySelectorAll('[data-savephase]'), function(btn){
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-savephase');
         var d = state.phaseDrafts[id] || {};
-        apiPost('updatePhase', {phaseId:id, title:d.title, tag:d.tag, range:d.range, location:d.location, reporting:d.reporting, output:d.output, objective:d.objective}).then(function(res){
+        apiPost('updatePhase', {phaseId:id, title:d.title, tag:d.tag, trackId:d.trackId, range:d.range, location:d.location, reporting:d.reporting, output:d.output, objective:d.objective}).then(function(res){
           if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
           state.programError = ''; loadProgram(); loadState();
         });
@@ -1362,15 +1448,86 @@
     if(createPhaseBtn){
       createPhaseBtn.addEventListener('click', function(){
         var d = state.newPhaseDraft;
-        if(!d.title || !d.title.trim()) return;
-        apiPost('createPhase', {title:d.title.trim(), tag:d.tag, range:d.range, location:d.location, reporting:d.reporting, output:d.output, objective:d.objective}).then(function(res){
+        if(!d.title || !d.title.trim() || !state.programTrackFilter) return;
+        apiPost('createPhase', {title:d.title.trim(), trackId:state.programTrackFilter, tag:d.tag, range:d.range, location:d.location, reporting:d.reporting, output:d.output, objective:d.objective}).then(function(res){
           if(!res.ok){ state.programError = res.error || 'Could not create'; render(); return; }
           state.programError = '';
-          state.newPhaseDraft = {title:'', tag:'', range:'', location:'', reporting:'', output:'', objective:''};
+          state.newPhaseDraft = {title:'', tag:'', range:'', location:'', reporting:'', output:'', objective:'', trackId:state.programTrackFilter};
           loadProgram(); loadState();
         });
       });
     }
+
+    var trackSelect = document.getElementById('programTrackSelect');
+    if(trackSelect){
+      trackSelect.addEventListener('change', function(){
+        state.programTrackFilter = trackSelect.value;
+        state.newPhaseDraft.trackId = trackSelect.value;
+        render();
+      });
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-newtrack]'), function(el){
+      el.addEventListener('input', function(){ state.newTrackDraft[el.getAttribute('data-newtrack')] = el.value; });
+    });
+    var createTrackBtn = document.getElementById('createTrackBtn');
+    if(createTrackBtn){
+      createTrackBtn.addEventListener('click', function(){
+        var d = state.newTrackDraft;
+        if(!d.name || !d.name.trim()) return;
+        apiPost('createTrack', {name:d.name.trim(), description:d.description}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not create track'; render(); return; }
+          state.programError = '';
+          state.newTrackDraft = {name:'', description:''};
+          loadProgram();
+        });
+      });
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-trackfield]'), function(el){
+      el.addEventListener('input', function(){
+        var parts = el.getAttribute('data-trackfield').split(':');
+        if(!state.trackDrafts[parts[0]]) state.trackDrafts[parts[0]] = {};
+        state.trackDrafts[parts[0]][parts[1]] = el.value;
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-savetrack]'), function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-savetrack');
+        var d = state.trackDrafts[id] || {};
+        apiPost('updateTrack', {trackId:id, name:d.name, description:d.description}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
+          state.programError = ''; loadProgram();
+        });
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-deletetrack]'), function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-deletetrack');
+        if(!confirm('Delete this track? It must have no Key Objectives and no employees on it.')) return;
+        apiPost('deleteTrack', {trackId:id}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not delete track'; render(); return; }
+          delete state.trackDrafts[id];
+          if(state.programTrackFilter===id) state.programTrackFilter = '';
+          state.programError = ''; loadProgram();
+        });
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-traineetrack]'), function(el){
+      el.addEventListener('change', function(){ state.traineeTrackDrafts[el.getAttribute('data-traineetrack')] = el.value; });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-savetraineetrack]'), function(btn){
+      btn.addEventListener('click', function(){
+        var traineeId = btn.getAttribute('data-savetraineetrack');
+        var trackId = state.traineeTrackDrafts[traineeId];
+        if(!trackId) return;
+        apiPost('setTraineeTrack', {traineeId:traineeId, trackId:trackId}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not reassign'; render(); return; }
+          state.programError = ''; loadProgram(); loadState();
+        });
+      });
+    });
   }
 
   function bindClick(sel, attr, fn){
