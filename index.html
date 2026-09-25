@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engineer Trainee CDP Tracker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ink:#1C2430; --ink-soft:#57616C; --ink-faint:#8A929B;
+    --paper:#F1F2EE; --surface:#FFFFFF; --surface-2:#E7E9E3; --border:#D7D9D2;
+    --navy:#1E3A5F; --navy-soft:#2F4E77; --navy-tint:#E4EAF1;
+    --amber:#C6851E; --amber-tint:#F6E9D2;
+    --ok:#2E7D4F; --ok-bg:#E3F1E7;
+    --pending:#2C5FA8; --pending-bg:#E5EDF8;
+    --changes:#B0432F; --changes-bg:#FBEAE5;
+    --muted:#9AA1A8; --muted-bg:#EDEEEA;
+    --shadow: 0 1px 2px rgba(28,36,48,.06), 0 4px 14px rgba(28,36,48,.05);
+    --font-display:'Big Shoulders Display',system-ui,sans-serif;
+    --font-body:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,'SF Mono',Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#E7E9E4; --ink-soft:#A7AFB7; --ink-faint:#6E7680;
+      --paper:#12161B; --surface:#1A2028; --surface-2:#1F2630; --border:#2B333E;
+      --navy:#7FA8D6; --navy-soft:#5B8FC7; --navy-tint:#182839;
+      --amber:#E3B04E; --amber-tint:#2E2410;
+      --ok:#62C48A; --ok-bg:#122A1C;
+      --pending:#6FA0DE; --pending-bg:#152539;
+      --changes:#E08672; --changes-bg:#331B17;
+      --muted:#6E7680; --muted-bg:#1E252D;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 6px 20px rgba(0,0,0,.3);
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0; padding:0; }
+  body{background:var(--paper); color:var(--ink); font-family:var(--font-body); line-height:1.45;}
+  ::selection{background:var(--navy-tint); color:var(--navy);}
+  :focus-visible{outline:2px solid var(--navy); outline-offset:2px;}
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important; transition-duration:.001ms !important;} }
+  img{max-width:100%;}
+  [hidden]{display:none !important;}
+
+  .tabular{ font-variant-numeric: tabular-nums; }
+  .mono{ font-family:var(--font-mono); }
+
+  #app{ max-width:1180px; margin:0 auto; padding:20px 20px 64px; }
+
+  #banner{
+    display:none; align-items:center; gap:10px; padding:10px 16px; border-radius:10px;
+    background:var(--changes-bg); color:var(--changes); font-size:13px; margin-bottom:16px;
+  }
+  #banner.show{ display:flex; }
+
+  header.top{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:24px;
+    padding-bottom:18px; margin-bottom:20px; border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  .brand{ display:flex; flex-direction:column; gap:6px; }
+  .brand .wordmark{
+    font-family:var(--font-display); font-weight:800; font-size:26px; letter-spacing:.5px;
+    color:var(--navy); text-transform:uppercase; line-height:1;
+  }
+  .brand .wordmark span{ color:var(--amber); }
+  .brand .doctitle{ font-size:19px; font-weight:600; color:var(--ink); }
+  .brand .docmeta{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; color:var(--ink-faint);
+    text-transform:uppercase; cursor:pointer;
+  }
+  .brand .docmeta:hover{ color:var(--navy); }
+
+  .top-right{ display:flex; align-items:center; gap:18px; }
+
+  .identity-chip{
+    display:flex; align-items:center; gap:10px; padding:8px 12px; border:1px solid var(--border);
+    border-radius:10px; background:var(--surface); cursor:pointer; box-shadow:var(--shadow);
+  }
+  .identity-chip:hover{ border-color:var(--navy-soft); }
+  .identity-avatar{
+    width:30px; height:30px; border-radius:50%; background:var(--navy); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-family:var(--font-display);
+    font-weight:700; font-size:13px; flex-shrink:0;
+  }
+  .identity-text{ display:flex; flex-direction:column; line-height:1.25; }
+  .identity-text .name{ font-weight:600; font-size:13px; }
+  .identity-text .role{ font-size:11px; color:var(--ink-soft); }
+
+  .gauge-wrap{ display:flex; align-items:center; gap:10px; }
+  .gauge-label{ display:flex; flex-direction:column; }
+  .gauge-label .n{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.06em; }
+  .gauge-label .v{ font-family:var(--font-mono); font-size:12px; color:var(--ink-faint); }
+
+  .layout{ display:grid; grid-template-columns:260px 1fr; gap:22px; align-items:start; }
+  @media (max-width:860px){ .layout{ grid-template-columns:1fr; } }
+
+  nav.rail{ display:flex; flex-direction:column; gap:10px; position:sticky; top:16px; }
+  @media (max-width:860px){ nav.rail{ position:static; flex-direction:row; overflow-x:auto; padding-bottom:4px; } }
+
+  .phase-card{
+    text-align:left; background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:14px 14px 12px; cursor:pointer; display:flex; flex-direction:column; gap:8px;
+    box-shadow:var(--shadow); flex-shrink:0; min-width:200px;
+  }
+  .phase-card.active{ border-color:var(--navy); box-shadow:0 0 0 1px var(--navy), var(--shadow); }
+  .phase-card .row1{ display:flex; align-items:baseline; gap:8px; }
+  .phase-card .tag{ font-family:var(--font-display); font-weight:800; font-size:26px; color:var(--navy); line-height:1; }
+  .phase-card .ptitle{ font-weight:600; font-size:13px; color:var(--ink); }
+  .phase-card .range{ font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.04em; }
+  .phase-card .bar{ height:6px; border-radius:4px; background:var(--muted-bg); overflow:hidden; }
+  .phase-card .bar > i{ display:block; height:100%; background:var(--ok); }
+  .phase-card .meta-row{ display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:10.5px; color:var(--ink-soft); }
+  .phase-card .pending-badge{ color:var(--pending); font-weight:600; }
+
+  main.content{ display:flex; flex-direction:column; gap:22px; min-width:0; }
+
+  .phase-header{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 22px; box-shadow:var(--shadow); }
+  .phase-header .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--navy); margin-bottom:6px; }
+  .phase-header h1{ font-family:var(--font-display); font-weight:800; font-size:30px; margin:0 0 10px; text-wrap:balance; }
+  .phase-header .objective{ color:var(--ink-soft); font-size:14.5px; max-width:66ch; margin-bottom:16px; }
+  .info-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; border-top:1px solid var(--border); padding-top:14px; }
+  .info-grid .field .k{ font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); margin-bottom:3px; }
+  .info-grid .field .v{ font-size:13px; font-weight:500; }
+
+  section.itemgroup{ display:flex; flex-direction:column; gap:10px; }
+  .group-title{ display:flex; align-items:center; gap:10px; }
+  .group-title h2{ font-family:var(--font-display); font-weight:700; font-size:18px; text-transform:uppercase; letter-spacing:.03em; margin:0; }
+  .group-title .count{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); }
+  .group-title .line{ flex:1; height:1px; background:var(--border); }
+
+  .item-list{ display:flex; flex-direction:column; gap:8px; }
+  .item{ background:var(--surface); border:1px solid var(--border); border-radius:11px; overflow:hidden; }
+  .item-row{ display:flex; align-items:flex-start; gap:12px; padding:13px 14px; cursor:pointer; }
+  .item-row .icon{ flex-shrink:0; margin-top:1px; }
+  .item-row .text{ flex:1; font-size:13.5px; }
+  .item-row .chip{ flex-shrink:0; font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:3px 8px; border-radius:20px; font-weight:600; white-space:nowrap; }
+  .chip.open{ background:var(--muted-bg); color:var(--ink-faint); }
+  .chip.submitted{ background:var(--pending-bg); color:var(--pending); }
+  .chip.approved{ background:var(--ok-bg); color:var(--ok); }
+  .chip.changes{ background:var(--changes-bg); color:var(--changes); }
+  .item-row .chev{ color:var(--ink-faint); flex-shrink:0; transition:transform .15s ease; margin-top:2px; }
+  .item.expanded .chev{ transform:rotate(90deg); }
+
+  .item-detail{ padding:0 14px 16px 42px; display:flex; flex-direction:column; gap:12px; border-top:1px solid var(--border); margin-top:0; padding-top:12px; }
+  .trace{ font-size:12px; color:var(--ink-soft); display:flex; flex-direction:column; gap:4px; }
+  .trace .who{ font-weight:600; color:var(--ink); }
+  .trace .stamp{ font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); }
+  .note-box{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--ink-soft); }
+  .note-box.changes{ background:var(--changes-bg); color:var(--changes); border-color:transparent; }
+
+  textarea.field-input{ width:100%; resize:vertical; min-height:56px; border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-family:var(--font-body); font-size:13px; background:var(--surface); color:var(--ink); }
+  textarea.field-input:focus{ border-color:var(--navy); }
+
+  .action-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button{ font-family:var(--font-body); cursor:pointer; }
+  .btn{ border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:600; border:1px solid transparent; }
+  .btn-primary{ background:var(--navy); color:#fff; }
+  .btn-primary:hover{ background:var(--navy-soft); }
+  .btn-ok{ background:var(--ok); color:#fff; }
+  .btn-danger-outline{ background:transparent; color:var(--changes); border-color:var(--changes); }
+  .btn-danger-outline:hover{ background:var(--changes-bg); }
+  .btn-ghost{ background:transparent; color:var(--ink-soft); border-color:var(--border); }
+  .btn-ghost:hover{ background:var(--surface-2); }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .hint{ font-size:11.5px; color:var(--ink-faint); }
+
+  .modal-veil{ position:fixed; inset:0; background:rgba(18,22,27,.5); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;}
+  .modal{ background:var(--surface); border-radius:16px; padding:26px 26px 22px; width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.35); border:1px solid var(--border); }
+  .modal h2{ font-family:var(--font-display); font-weight:800; font-size:22px; margin:0 0 4px; }
+  .modal p.sub{ color:var(--ink-soft); font-size:13px; margin:0 0 18px; }
+  .field-group{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+  .field-group label{ font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); font-family:var(--font-mono); }
+  .field-group input, .field-group select{ border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-size:14px; font-family:var(--font-body); background:var(--surface); color:var(--ink); }
+  .field-group input:focus, .field-group select:focus{ border-color:var(--navy); }
+
+  .footer-note{ text-align:center; color:var(--ink-faint); font-size:11.5px; margin-top:30px; font-family:var(--font-mono); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+
+  /* ============ CONFIG ============
+     Paste the Apps Script Web App /exec URL here after deploying (see
+     SETUP.md). Until then the app runs against an in-memory sample so the
+     page still shows something real when opened. */
+  var API_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
+  var POLL_MS = 15000;
+
+  var PHASES = [
+    { id:'1a', tag:'1A', title:'Core Station Rotations', range:'Months 1–3', location:'Production Floor',
+      reporting:'Manufacturing Manager / VP Production & Engineering', output:'Competency in Baseline, Braidline, Coverline operations; equipment familiarity',
+      objective:'Build hands-on working knowledge of all three primary production stages and supporting maintenance activities. Develop the foundational shop floor literacy required to credibly engage in process improvement work in Phase 2.' },
+    { id:'1b', tag:'1B', title:'Full Cycle, Field & Supply Chain', range:'Months 3–6', location:'Production Floor + Field',
+      reporting:'Manufacturing Manager / VP Production & Engineering', output:'Quality/testing proficiency; inventory & supply chain literacy; minimum 1 field install',
+      objective:'Deepen production competency across all stations, gain exposure to quality/testing leadership functions, complete supply chain and inventory literacy, and participate in at least one field installation to understand the end-to-end product lifecycle.' },
+    { id:'2', tag:'2', title:'Process Improvement', range:'Months 6–18', location:'Office + Shop Floor',
+      reporting:'VP Production & Engineering', output:'Documented improvement projects; project plan portfolio; shop efficiency metrics',
+      objective:'Transition from operator-level contributor to a hybrid engineering function. Leverage shop floor knowledge to identify, plan, and implement measurable process and equipment improvements. Develop project management capability in a real operational context.' },
+    { id:'3', tag:'3', title:'Design, Planning & Technical Development', range:'Months 18–24', location:'Office + Cross-functional',
+      reporting:'CTO / VP Production & Engineering', output:'Technical design contributions; planning documents; readiness for senior role',
+      objective:'Develop as a credible technical contributor in product design, process engineering, and capital planning. Support the CTO and VP Production & Engineering in design activities, process validation, and engineering documentation.' }
+  ];
+
+  var ROLES = ['Trainee','Manufacturing Manager','VP Production & Engineering','CTO','Viewer'];
+  var SUPERVISOR_ROLES = ['Manufacturing Manager','VP Production & Engineering','CTO'];
+
+  // Sample rows shown before the sheet API is configured / while offline,
+  // so the page never opens to an empty shell. Real fetched items replace
+  // this the moment API_URL is set and reachable.
+  var SAMPLE_ITEMS = [
+    {ItemId:'1a-a1', Phase:'1a', Kind:'activity', Text:'Baseline Station (min. 3 weeks) — extrusion parameters, line speed, material handling, dimensional inspection with calipers & Pi tape, production records, shift handover', Status:'approved', Note:'Completed all three weeks, signed off by shift lead.', SubmittedByName:'Sample Trainee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-02T14:00:00Z', ReviewedByName:'Sample Manager', ReviewedByRole:'Manufacturing Manager', ReviewedAt:'2026-06-03T09:00:00Z', ReviewNote:''},
+    {ItemId:'1a-a2', Phase:'1a', Kind:'activity', Text:'Braidline Station (min. 3 weeks) — braid angle & fiber tension, overlap/coverage, fiber count verification, in-process inspection per QWI QC 004', Status:'submitted', Note:'Finished rotation, ready for review.', SubmittedByName:'Sample Trainee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-10T16:00:00Z', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''},
+    {ItemId:'1a-c1', Phase:'1a', Kind:'criterion', Text:'Can set up, operate, and complete production records at all three stations without constant supervision', Status:'open', Note:'', SubmittedByName:'', SubmittedByRole:'', SubmittedAt:'', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''}
+  ];
+
+  /* ---------------- state ---------------- */
+  var state = {
+    role: localStorage.getItem('cdp_role') || '',
+    name: localStorage.getItem('cdp_name') || '',
+    activePhase: '1a',
+    items: {},
+    meta: {},
+    expanded: {},
+    drafts: {},
+    reviewDrafts: {},
+    loaded: false,
+    offline: false
+  };
+  var focusRestore = null;
+  var itemDefsCache = {}; // ItemId -> {Phase, Kind, Text} learned from fetched/sample rows
+
+  function apiConfigured(){ return API_URL && API_URL.indexOf('PASTE_') !== 0; }
+
+  function itemsForPhase(phaseId){
+    return Object.keys(itemDefsCache)
+      .map(function(id){ return itemDefsCache[id]; })
+      .filter(function(d){ return d.Phase===phaseId; })
+      .sort(function(a,b){ return (a.Order||0)-(b.Order||0) || a.ItemId.localeCompare(b.ItemId); });
+  }
+  function getItem(id){ return state.items[id] || {Status:'open'}; }
+
+  function counts(phaseId){
+    var defs = itemsForPhase(phaseId);
+    var approved=0, submitted=0;
+    defs.forEach(function(d){ var s=getItem(d.ItemId).Status; if(s==='approved') approved++; if(s==='submitted') submitted++; });
+    return {total:defs.length, approved:approved, submitted:submitted};
+  }
+  function overallCounts(){
+    var all = Object.keys(itemDefsCache);
+    var approved=0, submitted=0;
+    all.forEach(function(id){ var s=getItem(id).Status; if(s==='approved') approved++; if(s==='submitted') submitted++; });
+    return {total:all.length, approved:approved, submitted:submitted};
+  }
+
+  /* ---------------- icons ---------------- */
+  function icon(name, color){
+    var c = color || 'currentColor';
+    var svgs = {
+      circle: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>',
+      clock: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+      check: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>',
+      alert: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l9.5 17H2.5z"/><path d="M12 9.5v4.5"/><circle cx="12" cy="17" r="0.6" fill="'+c+'"/></svg>',
+      chev: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
+    };
+    return svgs[name] || '';
+  }
+  var STATUS_META = {
+    open:      {label:'Not started',    icon:'circle', color:'var(--muted)'},
+    submitted: {label:'Pending review', icon:'clock',  color:'var(--pending)'},
+    approved:  {label:'Approved',       icon:'check',  color:'var(--ok)'},
+    changes:   {label:'Changes requested', icon:'alert', color:'var(--changes)'}
+  };
+
+  function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
+  function fmtDate(iso){
+    if(!iso) return '';
+    try{ var d=new Date(iso); if(isNaN(d.getTime())) return String(iso); return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }
+    catch(e){ return String(iso); }
+  }
+  function initials(name){
+    if(!name) return '?';
+    var parts = name.trim().split(/\s+/);
+    return ((parts[0]||'')[0]||'') + ((parts[1]||'')[0]||'');
+  }
+
+  /* ---------------- gauge ---------------- */
+  function polar(cx,cy,r,angleDeg){ var a=(angleDeg-90)*Math.PI/180; return {x:cx+r*Math.cos(a), y:cy+r*Math.sin(a)}; }
+  function arcPath(cx,cy,r,a0,a1){
+    var p0=polar(cx,cy,r,a0), p1=polar(cx,cy,r,a1);
+    var large=(a1-a0)>180?1:0;
+    return 'M '+p0.x.toFixed(2)+' '+p0.y.toFixed(2)+' A '+r+' '+r+' 0 '+large+' 1 '+p1.x.toFixed(2)+' '+p1.y.toFixed(2);
+  }
+  function gaugeSvg(pct){
+    var cx=60, cy=58, r=42, start=-135, end=135;
+    var valAngle = start + (pct/100)*(end-start);
+    var ticks=[0,25,50,75,100].map(function(t){
+      var ang=start+(t/100)*(end-start);
+      var p0=polar(cx,cy,r+2,ang), p1=polar(cx,cy,r+8,ang);
+      return '<line x1="'+p0.x.toFixed(1)+'" y1="'+p0.y.toFixed(1)+'" x2="'+p1.x.toFixed(1)+'" y2="'+p1.y.toFixed(1)+'" stroke="var(--border)" stroke-width="2"/>';
+    }).join('');
+    return '<svg width="96" height="80" viewBox="0 0 120 92">'+
+      '<path d="'+arcPath(cx,cy,r,start,end)+'" fill="none" stroke="var(--muted-bg)" stroke-width="9" stroke-linecap="round"/>'+
+      (pct>0 ? '<path d="'+arcPath(cx,cy,r,start,valAngle)+'" fill="none" stroke="var(--navy)" stroke-width="9" stroke-linecap="round"/>' : '')+
+      ticks+
+      '<text x="60" y="60" text-anchor="middle" font-family="Big Shoulders Display" font-weight="800" font-size="26" fill="var(--ink)">'+Math.round(pct)+'</text>'+
+      '<text x="60" y="76" text-anchor="middle" font-family="IBM Plex Mono" font-size="8.5" letter-spacing="1" fill="var(--ink-faint)">PERCENT</text>'+
+    '</svg>';
+  }
+
+  /* ---------------- API ---------------- */
+  function loadState(){
+    if(!apiConfigured()){
+      // Demo/offline fallback: seed sample rows once so the page never opens
+      // to an empty shell, but don't re-seed on every poll tick — that would
+      // silently overwrite whatever the person just clicked while trying it out.
+      if(!state.loaded){
+        applyFetchedItems(SAMPLE_ITEMS);
+        state.meta = {TraineeName:'', StartDate:''};
+        state.loaded = true;
+      }
+      state.offline = true;
+      render();
+      return;
+    }
+    fetch(API_URL + '?action=state')
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if(!data.ok) throw new Error(data.error || 'Request failed');
+        applyFetchedItems(data.items);
+        state.meta = data.meta || {};
+        state.offline = false;
+        state.loaded = true;
+        render();
+      })
+      .catch(function(err){
+        console.error('loadState failed', err);
+        state.offline = true;
+        if(!state.loaded){ applyFetchedItems(SAMPLE_ITEMS); state.loaded = true; }
+        render();
+      });
+  }
+
+  function applyFetchedItems(rows){
+    (rows||[]).forEach(function(r){
+      itemDefsCache[r.ItemId] = {ItemId:r.ItemId, Phase:r.Phase, Kind:r.Kind, Text:r.Text, Order:r.Order};
+      state.items[r.ItemId] = r;
+    });
+  }
+
+  function post(action, payload){
+    if(!apiConfigured()) return Promise.resolve({ok:false, offline:true});
+    var body = Object.assign({action:action}, payload);
+    return fetch(API_URL, { method:'POST', body: JSON.stringify(body) })
+      .then(function(r){ return r.json(); })
+      .catch(function(err){ console.error('post failed', err); return {ok:false, error:String(err)}; });
+  }
+
+  /* ---------------- actions ---------------- */
+  function applyLocal(id, patch){
+    state.items[id] = Object.assign({}, getItem(id), patch);
+  }
+
+  function submitDone(def){
+    var note = (state.drafts[def.ItemId] || '').trim();
+    applyLocal(def.ItemId, { Status:'submitted', Note:note, SubmittedByName:state.name, SubmittedByRole:state.role, SubmittedAt:new Date().toISOString(), ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:'' });
+    delete state.drafts[def.ItemId];
+    state.expanded[def.ItemId] = true;
+    focusRestore = null;
+    render();
+    post('markDone', {itemId:def.ItemId, name:state.name, role:state.role, note:note}).then(function(res){
+      if(res.ok) applyLocal(def.ItemId, res.item);
+      render();
+    });
+  }
+  function withdraw(def){
+    applyLocal(def.ItemId, {Status:'open'});
+    render();
+    post('withdraw', {itemId:def.ItemId, name:state.name, role:state.role}).then(function(res){
+      if(res.ok) applyLocal(def.ItemId, res.item);
+      render();
+    });
+  }
+  function approve(def){
+    applyLocal(def.ItemId, {Status:'approved', ReviewedByName:state.name, ReviewedByRole:state.role, ReviewedAt:new Date().toISOString(), ReviewNote:''});
+    render();
+    post('approve', {itemId:def.ItemId, name:state.name, role:state.role}).then(function(res){
+      if(res.ok) applyLocal(def.ItemId, res.item);
+      render();
+    });
+  }
+  function requestChanges(def){
+    var reason = (state.reviewDrafts[def.ItemId] || '').trim();
+    if(!reason) return;
+    applyLocal(def.ItemId, {Status:'changes', ReviewedByName:state.name, ReviewedByRole:state.role, ReviewedAt:new Date().toISOString(), ReviewNote:reason});
+    delete state.reviewDrafts[def.ItemId];
+    render();
+    post('requestChanges', {itemId:def.ItemId, name:state.name, role:state.role, reason:reason}).then(function(res){
+      if(res.ok) applyLocal(def.ItemId, res.item);
+      render();
+    });
+  }
+  function saveMeta(traineeName, startDate){
+    state.meta = Object.assign({}, state.meta, {TraineeName:traineeName, StartDate:startDate});
+    render();
+    post('updateMeta', {traineeName:traineeName, startDate:startDate, name:state.name, role:state.role}).then(function(res){
+      if(res.ok) state.meta = res.meta;
+      render();
+    });
+  }
+
+  /* ---------------- render ---------------- */
+  function render(){
+    var app = document.getElementById('app');
+    var overall = overallCounts();
+    var pct = overall.total ? (overall.approved/overall.total*100) : 0;
+
+    var html = '';
+    html += '<div id="banner" class="'+(state.offline?'show':'')+'">Can\'t reach the tracking sheet — showing the last known state. Changes will retry automatically.</div>';
+    html += renderHeader(overall, pct);
+    html += '<div class="layout">';
+    html += renderRail();
+    html += renderMain();
+    html += '</div>';
+    html += '<div class="footer-note">CDP-001 &middot; Rev 01 &middot; Engineer Trainee (Process Engineer) &middot; syncs to the shared tracking sheet every '+Math.round(POLL_MS/1000)+'s</div>';
+
+    app.innerHTML = html;
+
+    if(!state.role || !state.name){ showIdentityModal(); }
+
+    wireEvents();
+    restoreFocus();
+  }
+
+  function renderHeader(overall, pct){
+    var initialsTxt = state.name ? esc(initials(state.name)) : '?';
+    var trainee = state.meta && state.meta.TraineeName ? state.meta.TraineeName : 'Unassigned';
+    return '' +
+    '<header class="top">' +
+      '<div class="brand">' +
+        '<div class="wordmark">Specialty<span>RTP</span></div>' +
+        '<div class="doctitle">Engineer Trainee — Career Development Plan</div>' +
+        '<div class="docmeta" id="programInfoBtn">Doc CDP-001 &middot; Rev 01 &middot; Trainee: '+esc(trainee)+' &middot; edit program info</div>' +
+      '</div>' +
+      '<div class="top-right">' +
+        '<div class="gauge-wrap">' +
+          gaugeSvg(pct) +
+          '<div class="gauge-label">' +
+            '<span class="n">Program complete</span>' +
+            '<span class="v tabular">'+overall.approved+' of '+overall.total+' approved &middot; '+overall.submitted+' pending</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="identity-chip" id="identityChip">' +
+          '<div class="identity-avatar">'+initialsTxt+'</div>' +
+          '<div class="identity-text">' +
+            '<span class="name">'+(state.name?esc(state.name):'Set your name')+'</span>' +
+            '<span class="role">'+(state.role?esc(state.role):'Choose a role')+'</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</header>';
+  }
+
+  function renderRail(){
+    var out = '<nav class="rail">';
+    PHASES.forEach(function(p){
+      var c = counts(p.id);
+      var pct = c.total ? Math.round(c.approved/c.total*100) : 0;
+      out += '<button class="phase-card'+(state.activePhase===p.id?' active':'')+'" data-phase="'+p.id+'">' +
+        '<div class="row1"><span class="tag">'+p.tag+'</span><span class="ptitle">'+esc(p.title)+'</span></div>' +
+        '<span class="range">'+esc(p.range)+'</span>' +
+        '<div class="bar"><i style="width:'+pct+'%"></i></div>' +
+        '<div class="meta-row"><span class="tabular">'+c.approved+' / '+c.total+' done</span>' +
+        (c.submitted>0 ? '<span class="pending-badge tabular">'+c.submitted+' pending</span>' : '<span></span>') +
+        '</div>' +
+      '</button>';
+    });
+    out += '</nav>';
+    return out;
+  }
+
+  function renderMain(){
+    var p = PHASES.filter(function(x){ return x.id===state.activePhase; })[0];
+    var out = '<main class="content">';
+    out += '<div class="phase-header">' +
+      '<div class="eyebrow">Phase '+p.tag+' &middot; '+esc(p.range)+'</div>' +
+      '<h1>'+esc(p.title)+'</h1>' +
+      '<p class="objective">'+esc(p.objective)+'</p>' +
+      '<div class="info-grid">' +
+        '<div class="field"><div class="k">Location</div><div class="v">'+esc(p.location)+'</div></div>' +
+        '<div class="field"><div class="k">Reports to</div><div class="v">'+esc(p.reporting)+'</div></div>' +
+        '<div class="field"><div class="k">Key output</div><div class="v">'+esc(p.output)+'</div></div>' +
+      '</div>' +
+    '</div>';
+
+    out += renderGroup(p.id, 'activity', 'Key Activities');
+    out += renderGroup(p.id, 'criterion', 'Completion Criteria');
+    out += '</main>';
+    return out;
+  }
+
+  function renderGroup(phaseId, kind, title){
+    var defs = itemsForPhase(phaseId).filter(function(d){ return d.Kind===kind; });
+    var done = defs.filter(function(d){ return getItem(d.ItemId).Status==='approved'; }).length;
+    var out = '<section class="itemgroup">' +
+      '<div class="group-title"><h2>'+title+'</h2><span class="count tabular">'+done+' / '+defs.length+'</span><span class="line"></span></div>' +
+      '<div class="item-list">';
+    if(defs.length===0){ out += '<div class="hint">No items loaded yet.</div>'; }
+    defs.forEach(function(d){ out += renderItem(d); });
+    out += '</div></section>';
+    return out;
+  }
+
+  function renderItem(def){
+    var it = getItem(def.ItemId);
+    var meta = STATUS_META[it.Status] || STATUS_META.open;
+    var isExpanded = !!state.expanded[def.ItemId];
+    var out = '<div class="item'+(isExpanded?' expanded':'')+'" data-id="'+def.ItemId+'">' +
+      '<div class="item-row" data-toggle="'+def.ItemId+'">' +
+        '<span class="icon">'+icon(meta.icon, meta.color)+'</span>' +
+        '<span class="text">'+esc(def.Text)+'</span>' +
+        '<span class="chip '+it.Status+'">'+meta.label+'</span>' +
+        '<span class="chev">'+icon('chev')+'</span>' +
+      '</div>';
+    if(isExpanded){ out += renderDetail(def, it); }
+    out += '</div>';
+    return out;
+  }
+
+  function renderDetail(def, it){
+    var out = '<div class="item-detail">';
+
+    if(it.Status==='submitted' || it.Status==='approved' || it.Status==='changes'){
+      out += '<div class="trace"><span class="who">Submitted by '+esc(it.SubmittedByName||'—')+' ('+esc(it.SubmittedByRole||'')+')</span>' +
+        '<span class="stamp tabular">'+fmtDate(it.SubmittedAt)+'</span></div>';
+      if(it.Note){ out += '<div class="note-box">'+esc(it.Note)+'</div>'; }
+    }
+    if(it.Status==='approved'){
+      out += '<div class="trace"><span class="who" style="color:var(--ok)">Approved by '+esc(it.ReviewedByName||'—')+' ('+esc(it.ReviewedByRole||'')+')</span>' +
+        '<span class="stamp tabular">'+fmtDate(it.ReviewedAt)+'</span></div>';
+    }
+    if(it.Status==='changes'){
+      out += '<div class="trace"><span class="who" style="color:var(--changes)">Changes requested by '+esc(it.ReviewedByName||'—')+' ('+esc(it.ReviewedByRole||'')+')</span>' +
+        '<span class="stamp tabular">'+fmtDate(it.ReviewedAt)+'</span></div>';
+      if(it.ReviewNote){ out += '<div class="note-box changes">'+esc(it.ReviewNote)+'</div>'; }
+    }
+
+    var isTrainee = state.role === 'Trainee';
+    var isSupervisor = SUPERVISOR_ROLES.indexOf(state.role) !== -1;
+
+    if(isTrainee && (it.Status==='open' || it.Status==='changes')){
+      var draft = state.drafts[def.ItemId] !== undefined ? state.drafts[def.ItemId] : '';
+      out += '<textarea class="field-input" data-note="'+def.ItemId+'" placeholder="Optional note for your supervisor (what you did, dates, who you worked with)…">'+esc(draft)+'</textarea>';
+      out += '<div class="action-row"><button class="btn btn-primary" data-submit="'+def.ItemId+'">Mark done — send for approval</button></div>';
+    } else if(isTrainee && it.Status==='submitted'){
+      out += '<div class="hint">Waiting on '+esc(PHASES.filter(function(p){return p.id===def.Phase;})[0].reporting)+'.</div>';
+      out += '<div class="action-row"><button class="btn btn-ghost" data-withdraw="'+def.ItemId+'">Withdraw submission</button></div>';
+    } else if(isTrainee && it.Status==='approved'){
+      out += '<div class="hint">Signed off. Nice work.</div>';
+    }
+
+    if(isSupervisor && it.Status==='submitted'){
+      var rdraft = state.reviewDrafts[def.ItemId] !== undefined ? state.reviewDrafts[def.ItemId] : '';
+      out += '<div class="action-row"><button class="btn btn-ok" data-approve="'+def.ItemId+'">Approve</button></div>';
+      out += '<textarea class="field-input" data-reason="'+def.ItemId+'" placeholder="Reason for sending back (required to request changes)…">'+esc(rdraft)+'</textarea>';
+      out += '<div class="action-row"><button class="btn btn-danger-outline" data-reject="'+def.ItemId+'">Request changes</button></div>';
+    } else if(isSupervisor && it.Status!=='submitted'){
+      out += '<div class="hint">Nothing awaiting your review on this item.</div>';
+    }
+
+    if(state.role==='Viewer' || !state.role){
+      out += '<div class="hint">Read-only view.</div>';
+    }
+
+    out += '</div>';
+    return out;
+  }
+
+  /* ---------------- identity modal ---------------- */
+  function showIdentityModal(){
+    if(document.getElementById('identityVeil')) return;
+    var veil = document.createElement('div');
+    veil.className = 'modal-veil';
+    veil.id = 'identityVeil';
+    veil.innerHTML = '<div class="modal">' +
+      '<h2>Who’s tracking?</h2>' +
+      '<p class="sub">Your name and role are saved on this device and attached to anything you submit or approve.</p>' +
+      '<div class="field-group"><label>Name</label><input type="text" id="nameInput" value="'+esc(state.name)+'" placeholder="Full name"></div>' +
+      '<div class="field-group"><label>Role</label><select id="roleInput">' +
+        '<option value="">Select…</option>' +
+        ROLES.map(function(r){ return '<option value="'+r+'"'+(state.role===r?' selected':'')+'>'+r+'</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="action-row"><button class="btn btn-primary" id="saveIdentity">Continue</button></div>' +
+    '</div>';
+    document.body.appendChild(veil);
+    document.getElementById('saveIdentity').addEventListener('click', function(){
+      var n = document.getElementById('nameInput').value.trim();
+      var r = document.getElementById('roleInput').value;
+      if(!n || !r) return;
+      state.name = n; state.role = r;
+      localStorage.setItem('cdp_name', n);
+      localStorage.setItem('cdp_role', r);
+      veil.remove();
+      render();
+    });
+  }
+
+  function showProgramInfoModal(){
+    if(document.getElementById('programVeil')) return;
+    var veil = document.createElement('div');
+    veil.className = 'modal-veil';
+    veil.id = 'programVeil';
+    var trainee = state.meta.TraineeName || '';
+    var start = state.meta.StartDate || '';
+    veil.innerHTML = '<div class="modal">' +
+      '<h2>Program info</h2>' +
+      '<p class="sub">Shown in the header for everyone viewing this tracker.</p>' +
+      '<div class="field-group"><label>Trainee name</label><input type="text" id="traineeInput" value="'+esc(trainee)+'"></div>' +
+      '<div class="field-group"><label>Program start date</label><input type="date" id="startInput" value="'+esc(start)+'"></div>' +
+      '<div class="action-row"><button class="btn btn-primary" id="saveProgram">Save</button><button class="btn btn-ghost" id="cancelProgram">Cancel</button></div>' +
+    '</div>';
+    document.body.appendChild(veil);
+    document.getElementById('cancelProgram').addEventListener('click', function(){ veil.remove(); });
+    document.getElementById('saveProgram').addEventListener('click', function(){
+      var t = document.getElementById('traineeInput').value.trim();
+      var s = document.getElementById('startInput').value;
+      veil.remove();
+      saveMeta(t, s);
+    });
+  }
+
+  /* ---------------- events ---------------- */
+  function wireEvents(){
+    var chip = document.getElementById('identityChip');
+    if(chip) chip.addEventListener('click', showIdentityModal);
+    var infoBtn = document.getElementById('programInfoBtn');
+    if(infoBtn) infoBtn.addEventListener('click', showProgramInfoModal);
+
+    Array.prototype.forEach.call(document.querySelectorAll('.phase-card'), function(btn){
+      btn.addEventListener('click', function(){ state.activePhase = btn.getAttribute('data-phase'); render(); });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-toggle]'), function(row){
+      row.addEventListener('click', function(){
+        var id = row.getAttribute('data-toggle');
+        state.expanded[id] = !state.expanded[id];
+        render();
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-note]'), function(ta){
+      ta.addEventListener('input', function(){
+        state.drafts[ta.getAttribute('data-note')] = ta.value;
+        focusRestore = {id: ta.getAttribute('data-note'), kind:'note', pos: ta.selectionStart};
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-reason]'), function(ta){
+      ta.addEventListener('input', function(){
+        state.reviewDrafts[ta.getAttribute('data-reason')] = ta.value;
+        focusRestore = {id: ta.getAttribute('data-reason'), kind:'reason', pos: ta.selectionStart};
+      });
+    });
+
+    bindClick('[data-submit]', 'data-submit', function(def){ submitDone(def); });
+    bindClick('[data-withdraw]', 'data-withdraw', function(def){ withdraw(def); });
+    bindClick('[data-approve]', 'data-approve', function(def){ approve(def); });
+    bindClick('[data-reject]', 'data-reject', function(def){ requestChanges(def); });
+  }
+
+  function bindClick(sel, attr, fn){
+    Array.prototype.forEach.call(document.querySelectorAll(sel), function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var id = btn.getAttribute(attr);
+        var def = itemDefsCache[id];
+        if(def) fn(def);
+      });
+    });
+  }
+
+  function restoreFocus(){
+    if(!focusRestore) return;
+    var sel = focusRestore.kind==='note' ? '[data-note="'+focusRestore.id+'"]' : '[data-reason="'+focusRestore.id+'"]';
+    var el = document.querySelector(sel);
+    if(el){ el.focus(); try{ el.setSelectionRange(focusRestore.pos, focusRestore.pos); }catch(e){} }
+  }
+
+  /* ---------------- boot ---------------- */
+  loadState();
+  setInterval(loadState, POLL_MS);
+})();
+</script>
+</body>
+</html>
