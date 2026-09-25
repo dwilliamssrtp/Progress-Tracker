@@ -41,6 +41,7 @@
   @media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important; transition-duration:.001ms !important;} }
   img{max-width:100%;}
   [hidden]{display:none !important;}
+  a{color:var(--navy);}
 
   .tabular{ font-variant-numeric: tabular-nums; }
   .mono{ font-family:var(--font-mono); }
@@ -55,7 +56,7 @@
 
   header.top{
     display:flex; align-items:flex-start; justify-content:space-between; gap:24px;
-    padding-bottom:18px; margin-bottom:20px; border-bottom:1px solid var(--border);
+    padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid var(--border);
     flex-wrap:wrap;
   }
   .brand{ display:flex; flex-direction:column; gap:6px; }
@@ -66,10 +67,12 @@
   .brand .wordmark span{ color:var(--amber); }
   .brand .doctitle{ font-size:19px; font-weight:600; color:var(--ink); }
   .brand .docmeta{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
     font-family:var(--font-mono); font-size:11px; letter-spacing:.04em; color:var(--ink-faint);
-    text-transform:uppercase; cursor:pointer;
+    text-transform:uppercase;
   }
-  .brand .docmeta:hover{ color:var(--navy); }
+  .brand .docmeta a, .brand .docmeta .linklike{ color:var(--ink-faint); cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+  .brand .docmeta a:hover, .brand .docmeta .linklike:hover{ color:var(--navy); }
 
   .top-right{ display:flex; align-items:center; gap:18px; }
 
@@ -91,6 +94,14 @@
   .gauge-label{ display:flex; flex-direction:column; }
   .gauge-label .n{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.06em; }
   .gauge-label .v{ font-family:var(--font-mono); font-size:12px; color:var(--ink-faint); }
+
+  nav.tabs{ display:flex; gap:6px; margin-bottom:18px; border-bottom:1px solid var(--border); }
+  nav.tabs button{
+    background:none; border:none; padding:10px 4px; margin-right:18px; font-family:var(--font-body);
+    font-weight:600; font-size:13.5px; color:var(--ink-faint); cursor:pointer; border-bottom:2px solid transparent;
+  }
+  nav.tabs button.active{ color:var(--navy); border-bottom-color:var(--navy); }
+  nav.tabs button:hover{ color:var(--navy); }
 
   .layout{ display:grid; grid-template-columns:260px 1fr; gap:22px; align-items:start; }
   @media (max-width:860px){ .layout{ grid-template-columns:1fr; } }
@@ -162,11 +173,13 @@
   .btn-danger-outline:hover{ background:var(--changes-bg); }
   .btn-ghost{ background:transparent; color:var(--ink-soft); border-color:var(--border); }
   .btn-ghost:hover{ background:var(--surface-2); }
+  .btn-sm{ padding:5px 10px; font-size:11.5px; }
   .btn:disabled{ opacity:.5; cursor:not-allowed; }
   .hint{ font-size:11.5px; color:var(--ink-faint); }
+  .error-text{ font-size:12.5px; color:var(--changes); }
 
   .modal-veil{ position:fixed; inset:0; background:rgba(18,22,27,.5); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;}
-  .modal{ background:var(--surface); border-radius:16px; padding:26px 26px 22px; width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.35); border:1px solid var(--border); }
+  .modal{ background:var(--surface); border-radius:16px; padding:26px 26px 22px; width:100%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,.35); border:1px solid var(--border); max-height:88vh; overflow-y:auto; }
   .modal h2{ font-family:var(--font-display); font-weight:800; font-size:22px; margin:0 0 4px; }
   .modal p.sub{ color:var(--ink-soft); font-size:13px; margin:0 0 18px; }
   .field-group{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
@@ -175,6 +188,40 @@
   .field-group input:focus, .field-group select:focus{ border-color:var(--navy); }
 
   .footer-note{ text-align:center; color:var(--ink-faint); font-size:11.5px; margin-top:30px; font-family:var(--font-mono); }
+
+  /* ---- login page ---- */
+  .login-shell{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .login-card{ width:100%; max-width:380px; background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:32px 30px; box-shadow:var(--shadow); }
+  .login-card .wordmark{ font-family:var(--font-display); font-weight:800; font-size:24px; color:var(--navy); text-transform:uppercase; margin-bottom:4px; }
+  .login-card .wordmark span{ color:var(--amber); }
+  .login-card h1{ font-family:var(--font-display); font-weight:700; font-size:20px; margin:0 0 20px; }
+  .login-card .btn-primary{ width:100%; padding:10px 14px; font-size:13.5px; }
+
+  /* ---- roster ---- */
+  .roster-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+  .roster-card{
+    text-align:left; background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:16px; cursor:pointer; display:flex; flex-direction:column; gap:10px; box-shadow:var(--shadow);
+  }
+  .roster-card:hover{ border-color:var(--navy-soft); }
+  .roster-card .name{ font-family:var(--font-display); font-weight:800; font-size:19px; }
+  .roster-card .start{ font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); text-transform:uppercase; }
+  .roster-card .bar{ height:7px; border-radius:4px; background:var(--muted-bg); overflow:hidden; }
+  .roster-card .bar > i{ display:block; height:100%; background:var(--ok); }
+  .roster-card .stats{ display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); }
+
+  /* ---- admin ---- */
+  .admin-section{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 22px; box-shadow:var(--shadow); margin-bottom:20px; }
+  .admin-section h2{ font-family:var(--font-display); font-weight:700; font-size:18px; margin:0 0 14px; text-transform:uppercase; letter-spacing:.03em; }
+  table.accounts{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.accounts th{ text-align:left; font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-faint); padding:6px 8px; border-bottom:1px solid var(--border); }
+  table.accounts td{ padding:8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  table.accounts tr:last-child td{ border-bottom:none; }
+  .pill{ font-family:var(--font-mono); font-size:10px; text-transform:uppercase; padding:2px 7px; border-radius:20px; font-weight:600; }
+  .pill.active{ background:var(--ok-bg); color:var(--ok); }
+  .pill.inactive{ background:var(--muted-bg); color:var(--ink-faint); }
+  .table-wrap{ overflow-x:auto; }
+  .create-form{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; align-items:end; }
 </style>
 </head>
 <body>
@@ -187,8 +234,9 @@
      Paste the Apps Script Web App /exec URL here after deploying (see
      SETUP.md). Until then the app runs against an in-memory sample so the
      page still shows something real when opened. */
-  var API_URL = 'https://script.google.com/macros/s/AKfycbw8DCiGLB1qmIRybMG93Jwl_F9VRIx2jQgCr_o5xSW4cUVLzeHhECNsnqeYJgr72Uog-w/exec';
+  var API_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
   var POLL_MS = 15000;
+  var PDF_URL = './CDP-001.pdf';
 
   var PHASES = [
     { id:'1a', tag:'1A', title:'Core Station Rotations', range:'Months 1–3', location:'Production Floor',
@@ -205,35 +253,47 @@
       objective:'Develop as a credible technical contributor in product design, process engineering, and capital planning. Support the CTO and VP Production & Engineering in design activities, process validation, and engineering documentation.' }
   ];
 
-  var ROLES = ['Trainee','Manufacturing Manager','VP Production & Engineering','CTO','Viewer'];
-  var SUPERVISOR_ROLES = ['Manufacturing Manager','VP Production & Engineering','CTO'];
+  var ROLES = ['Trainee','Manufacturing Manager','VP Production & Engineering','CTO','Admin','Viewer'];
+  var SUPERVISOR_ROLES = ['Manufacturing Manager','VP Production & Engineering','CTO','Admin'];
 
   // Sample rows shown before the sheet API is configured / while offline,
-  // so the page never opens to an empty shell. Real fetched items replace
-  // this the moment API_URL is set and reachable.
+  // so the page never opens to an empty shell.
   var SAMPLE_ITEMS = [
-    {ItemId:'1a-a1', Phase:'1a', Kind:'activity', Text:'Baseline Station (min. 3 weeks) — extrusion parameters, line speed, material handling, dimensional inspection with calipers & Pi tape, production records, shift handover', Status:'approved', Note:'Completed all three weeks, signed off by shift lead.', SubmittedByName:'Sample Trainee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-02T14:00:00Z', ReviewedByName:'Sample Manager', ReviewedByRole:'Manufacturing Manager', ReviewedAt:'2026-06-03T09:00:00Z', ReviewNote:''},
-    {ItemId:'1a-a2', Phase:'1a', Kind:'activity', Text:'Braidline Station (min. 3 weeks) — braid angle & fiber tension, overlap/coverage, fiber count verification, in-process inspection per QWI QC 004', Status:'submitted', Note:'Finished rotation, ready for review.', SubmittedByName:'Sample Trainee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-10T16:00:00Z', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''},
+    {ItemId:'1a-a1', Phase:'1a', Kind:'activity', Text:'Baseline Station (max. 3 weeks) — extrusion parameters, line speed, material handling, dimensional inspection with calipers & Pi tape, production records, shift handover', Status:'approved', Note:'Completed all three weeks, signed off by shift lead.', SubmittedByName:'Sample Trainee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-02T14:00:00Z', ReviewedByName:'Sample Manager', ReviewedByRole:'Manufacturing Manager', ReviewedAt:'2026-06-03T09:00:00Z', ReviewNote:''},
+    {ItemId:'1a-a2', Phase:'1a', Kind:'activity', Text:'Braidline Station (max. 3 weeks) — braid angle & fiber tension, overlap/coverage, fiber count verification, in-process inspection per QWI QC 004', Status:'submitted', Note:'Finished rotation, ready for review.', SubmittedByName:'Sample Trainee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-10T16:00:00Z', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''},
     {ItemId:'1a-c1', Phase:'1a', Kind:'criterion', Text:'Can set up, operate, and complete production records at all three stations without constant supervision', Status:'open', Note:'', SubmittedByName:'', SubmittedByRole:'', SubmittedAt:'', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''}
+  ];
+  var SAMPLE_ROSTER = [
+    {traineeId:'sample-1', name:'Sample Trainee', startDate:'2026-05-01', status:'active', total:3, approved:1, submitted:1}
   ];
 
   /* ---------------- state ---------------- */
   var state = {
-    role: localStorage.getItem('cdp_role') || '',
-    name: localStorage.getItem('cdp_name') || '',
+    token: localStorage.getItem('cdp_token') || '',
+    account: JSON.parse(localStorage.getItem('cdp_account') || 'null'),
+    view: 'roster',        // 'roster' | 'trainee' | 'admin'
+    activeTraineeId: '',
+    isOwnTrainee: false,
     activePhase: '1a',
     items: {},
-    meta: {},
+    trainee: null,
+    roster: [],
+    admin: null,           // {accounts, trainees} once loaded
     expanded: {},
     drafts: {},
     reviewDrafts: {},
     loaded: false,
-    offline: false
+    offline: false,
+    loginError: '',
+    adminError: ''
   };
   var focusRestore = null;
-  var itemDefsCache = {}; // ItemId -> {Phase, Kind, Text} learned from fetched/sample rows
+  var itemDefsCache = {};
 
   function apiConfigured(){ return API_URL && API_URL.indexOf('PASTE_') !== 0; }
+  function isTraineeAcct(){ return state.account && state.account.role === 'Trainee'; }
+  function isSupervisorAcct(){ return state.account && SUPERVISOR_ROLES.indexOf(state.account.role) !== -1; }
+  function isAdminAcct(){ return state.account && state.account.role === 'Admin'; }
 
   function itemsForPhase(phaseId){
     return Object.keys(itemDefsCache)
@@ -242,7 +302,6 @@
       .sort(function(a,b){ return (a.Order||0)-(b.Order||0) || a.ItemId.localeCompare(b.ItemId); });
   }
   function getItem(id){ return state.items[id] || {Status:'open'}; }
-
   function counts(phaseId){
     var defs = itemsForPhase(phaseId);
     var approved=0, submitted=0;
@@ -264,7 +323,8 @@
       clock: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
       check: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>',
       alert: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l9.5 17H2.5z"/><path d="M12 9.5v4.5"/><circle cx="12" cy="17" r="0.6" fill="'+c+'"/></svg>',
-      chev: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
+      chev: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+      back: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>'
     };
     return svgs[name] || '';
   }
@@ -311,83 +371,156 @@
     '</svg>';
   }
 
+  /* ---------------- auth ---------------- */
+  function persistAuth(){
+    localStorage.setItem('cdp_token', state.token);
+    localStorage.setItem('cdp_account', JSON.stringify(state.account));
+  }
+  function clearAuth(){
+    state.token=''; state.account=null;
+    localStorage.removeItem('cdp_token'); localStorage.removeItem('cdp_account');
+    state.loaded=false; state.items={}; itemDefsCache={}; state.roster=[]; state.admin=null;
+    state.view='roster'; state.activeTraineeId='';
+  }
+
+  function login(username, password){
+    if(!apiConfigured()){
+      state.loginError = 'API_URL is not configured yet — see SETUP.md. Showing the sample view below instead.';
+      render();
+      return;
+    }
+    fetch(API_URL, {method:'POST', body: JSON.stringify({action:'login', username:username, password:password})})
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if(!res.ok){ state.loginError = res.error || 'Login failed'; render(); return; }
+        state.token = res.token; state.account = res.account; state.loginError = '';
+        persistAuth();
+        state.view = isTraineeAcct() ? 'trainee' : 'roster';
+        loadState();
+      })
+      .catch(function(err){ state.loginError = 'Could not reach the server.'; render(); });
+  }
+
   /* ---------------- API ---------------- */
+  function apiGet(params){
+    var qs = Object.keys(params||{}).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
+    return fetch(API_URL + '?token=' + encodeURIComponent(state.token) + (qs ? '&'+qs : ''))
+      .then(function(r){ return r.json(); });
+  }
+  function apiPost(action, payload){
+    var body = Object.assign({action:action, token:state.token}, payload);
+    return fetch(API_URL, { method:'POST', body: JSON.stringify(body) })
+      .then(function(r){ return r.json(); })
+      .catch(function(err){ return {ok:false, error:String(err)}; });
+  }
+
   function loadState(){
     if(!apiConfigured()){
-      // Demo/offline fallback: seed sample rows once so the page never opens
-      // to an empty shell, but don't re-seed on every poll tick — that would
-      // silently overwrite whatever the person just clicked while trying it out.
       if(!state.loaded){
         applyFetchedItems(SAMPLE_ITEMS);
-        state.meta = {TraineeName:'', StartDate:''};
+        state.trainee = {traineeId:'sample-1', name:'Sample Trainee', startDate:'2026-05-01'};
+        state.roster = SAMPLE_ROSTER;
+        state.activeTraineeId = 'sample-1';
         state.loaded = true;
       }
       state.offline = true;
       render();
       return;
     }
-    fetch(API_URL + '?action=state')
-      .then(function(r){ return r.json(); })
-      .then(function(data){
-        if(!data.ok) throw new Error(data.error || 'Request failed');
-        applyFetchedItems(data.items);
-        state.meta = data.meta || {};
-        state.offline = false;
-        state.loaded = true;
-        render();
-      })
-      .catch(function(err){
-        console.error('loadState failed', err);
-        state.offline = true;
-        if(!state.loaded){ applyFetchedItems(SAMPLE_ITEMS); state.loaded = true; }
-        render();
-      });
+    if(!state.token){ render(); return; }
+
+    var params = {};
+    if(isTraineeAcct()){ /* server infers from account, no traineeId needed */ }
+    else if(state.view==='trainee' && state.activeTraineeId){ params.traineeId = state.activeTraineeId; }
+
+    apiGet(params).then(function(res){
+      if(!res.ok){
+        if(res.error==='auth'){ clearAuth(); render(); return; }
+        state.offline = true; render(); return;
+      }
+      state.offline = false; state.loaded = true;
+      if(res.mode==='trainee'){
+        applyFetchedItems(res.items);
+        state.trainee = res.trainee;
+        state.activeTraineeId = res.trainee ? res.trainee.traineeId : state.account.traineeId;
+        state.isOwnTrainee = true;
+        state.view = 'trainee';
+      } else if(res.mode==='detail'){
+        applyFetchedItems(res.items);
+        state.trainee = res.trainee;
+        state.isOwnTrainee = false;
+        state.view = 'trainee';
+      } else if(res.mode==='roster'){
+        state.roster = Array.isArray(res.trainees) ? res.trainees : [];
+        if(state.view!=='admin') state.view = 'roster';
+      }
+      render();
+    }).catch(function(){ state.offline = true; render(); });
   }
 
   function applyFetchedItems(rows){
+    itemDefsCache = {};
+    state.items = {};
     (rows||[]).forEach(function(r){
       itemDefsCache[r.ItemId] = {ItemId:r.ItemId, Phase:r.Phase, Kind:r.Kind, Text:r.Text, Order:r.Order};
       state.items[r.ItemId] = r;
     });
   }
 
-  function post(action, payload){
-    if(!apiConfigured()) return Promise.resolve({ok:false, offline:true});
-    var body = Object.assign({action:action}, payload);
-    return fetch(API_URL, { method:'POST', body: JSON.stringify(body) })
-      .then(function(r){ return r.json(); })
-      .catch(function(err){ console.error('post failed', err); return {ok:false, error:String(err)}; });
+  function openTrainee(traineeId){
+    state.activeTraineeId = traineeId;
+    state.view = 'trainee';
+    state.expanded = {};
+    render();
+    loadState();
+  }
+  function backToRoster(){
+    state.view = 'roster';
+    state.activeTraineeId = '';
+    render();
+    loadState();
+  }
+  function openAdmin(){
+    state.view = 'admin';
+    render();
+    loadAdmin();
+  }
+  function loadAdmin(){
+    apiPost('listAccounts', {}).then(function(res){
+      if(!res.ok){ if(res.error==='auth'){ clearAuth(); } state.adminError = res.error||''; render(); return; }
+      state.admin = { accounts: Array.isArray(res.accounts)?res.accounts:[], trainees: Array.isArray(res.trainees)?res.trainees:[] };
+      state.adminError=''; render();
+    });
   }
 
   /* ---------------- actions ---------------- */
   function applyLocal(id, patch){
     state.items[id] = Object.assign({}, getItem(id), patch);
   }
-
   function submitDone(def){
     var note = (state.drafts[def.ItemId] || '').trim();
-    applyLocal(def.ItemId, { Status:'submitted', Note:note, SubmittedByName:state.name, SubmittedByRole:state.role, SubmittedAt:new Date().toISOString(), ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:'' });
+    applyLocal(def.ItemId, { Status:'submitted', Note:note, SubmittedByName:state.account.name, SubmittedByRole:state.account.role, SubmittedAt:new Date().toISOString(), ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:'' });
     delete state.drafts[def.ItemId];
     state.expanded[def.ItemId] = true;
     focusRestore = null;
     render();
-    post('markDone', {itemId:def.ItemId, name:state.name, role:state.role, note:note}).then(function(res){
-      if(res.ok) applyLocal(def.ItemId, res.item);
+    apiPost('markDone', {itemId:def.ItemId, traineeId:state.activeTraineeId, note:note}).then(function(res){
+      if(res.ok) applyLocal(def.ItemId, res.item); else if(res.error==='auth'){ clearAuth(); }
       render();
     });
   }
   function withdraw(def){
     applyLocal(def.ItemId, {Status:'open'});
     render();
-    post('withdraw', {itemId:def.ItemId, name:state.name, role:state.role}).then(function(res){
+    apiPost('withdraw', {itemId:def.ItemId, traineeId:state.activeTraineeId}).then(function(res){
       if(res.ok) applyLocal(def.ItemId, res.item);
       render();
     });
   }
   function approve(def){
-    applyLocal(def.ItemId, {Status:'approved', ReviewedByName:state.name, ReviewedByRole:state.role, ReviewedAt:new Date().toISOString(), ReviewNote:''});
+    applyLocal(def.ItemId, {Status:'approved', ReviewedByName:state.account.name, ReviewedByRole:state.account.role, ReviewedAt:new Date().toISOString(), ReviewNote:''});
     render();
-    post('approve', {itemId:def.ItemId, name:state.name, role:state.role}).then(function(res){
+    apiPost('approve', {itemId:def.ItemId, traineeId:state.activeTraineeId}).then(function(res){
       if(res.ok) applyLocal(def.ItemId, res.item);
       render();
     });
@@ -395,73 +528,150 @@
   function requestChanges(def){
     var reason = (state.reviewDrafts[def.ItemId] || '').trim();
     if(!reason) return;
-    applyLocal(def.ItemId, {Status:'changes', ReviewedByName:state.name, ReviewedByRole:state.role, ReviewedAt:new Date().toISOString(), ReviewNote:reason});
+    applyLocal(def.ItemId, {Status:'changes', ReviewedByName:state.account.name, ReviewedByRole:state.account.role, ReviewedAt:new Date().toISOString(), ReviewNote:reason});
     delete state.reviewDrafts[def.ItemId];
     render();
-    post('requestChanges', {itemId:def.ItemId, name:state.name, role:state.role, reason:reason}).then(function(res){
+    apiPost('requestChanges', {itemId:def.ItemId, traineeId:state.activeTraineeId, reason:reason}).then(function(res){
       if(res.ok) applyLocal(def.ItemId, res.item);
       render();
     });
   }
-  function saveMeta(traineeName, startDate){
-    state.meta = Object.assign({}, state.meta, {TraineeName:traineeName, StartDate:startDate});
+  function saveTraineeMeta(name, startDate){
+    state.trainee = Object.assign({}, state.trainee, {name:name, startDate:startDate});
     render();
-    post('updateMeta', {traineeName:traineeName, startDate:startDate, name:state.name, role:state.role}).then(function(res){
-      if(res.ok) state.meta = res.meta;
+    apiPost('updateTraineeMeta', {traineeId:state.activeTraineeId, name:name, startDate:startDate}).then(function(res){
+      if(res.ok) state.trainee = res.trainee;
       render();
     });
   }
 
-  /* ---------------- render ---------------- */
+  /* ---------------- render dispatch ---------------- */
   function render(){
+    if(!state.token && apiConfigured()){ renderLogin(); return; }
+    if(!state.token && !apiConfigured()){
+      // Offline demo: let the person poke around the sample without logging in.
+      if(!state.account) state.account = {name:'Demo Viewer', role:'Viewer', traineeId:'sample-1'};
+      renderShell();
+      return;
+    }
+    renderShell();
+  }
+
+  function renderLogin(){
     var app = document.getElementById('app');
-    var overall = overallCounts();
-    var pct = overall.total ? (overall.approved/overall.total*100) : 0;
+    app.innerHTML =
+      '<div class="login-shell"><div class="login-card">' +
+        '<div class="wordmark">Specialty<span>RTP</span></div>' +
+        '<h1>Engineer Trainee CDP Tracker</h1>' +
+        '<div class="field-group"><label>Username</label><input type="text" id="loginUser" autocomplete="username"></div>' +
+        '<div class="field-group"><label>Password</label><input type="password" id="loginPass" autocomplete="current-password"></div>' +
+        (state.loginError ? '<p class="error-text">'+esc(state.loginError)+'</p>' : '') +
+        '<button class="btn btn-primary" id="loginBtn">Log in</button>' +
+        '<p class="hint" style="margin-top:14px;">New here? Ask your admin for a username and password.</p>' +
+      '</div></div>';
 
+    var go = function(){
+      var u = document.getElementById('loginUser').value.trim();
+      var p = document.getElementById('loginPass').value;
+      if(!u || !p) return;
+      login(u, p);
+    };
+    document.getElementById('loginBtn').addEventListener('click', go);
+    ['loginUser','loginPass'].forEach(function(id){
+      document.getElementById(id).addEventListener('keydown', function(e){ if(e.key==='Enter') go(); });
+    });
+  }
+
+  function renderShell(){
+    var app = document.getElementById('app');
     var html = '';
+    html += '<div id="app-inner">';
     html += '<div id="banner" class="'+(state.offline?'show':'')+'">Can\'t reach the tracking sheet — showing the last known state. Changes will retry automatically.</div>';
-    html += renderHeader(overall, pct);
-    html += '<div class="layout">';
-    html += renderRail();
-    html += renderMain();
+    html += renderHeader();
+    if(!isTraineeAcct()){ html += renderTabs(); }
+
+    if(state.view==='admin' && isAdminAcct()){
+      html += renderAdmin();
+    } else if(state.view==='trainee' && state.activeTraineeId){
+      html += renderTraineeView();
+    } else {
+      html += renderRoster();
+    }
+
+    html += '<div class="footer-note">CDP-001 &middot; Rev 01 &middot; Engineer Trainee (Process Engineer)'+(apiConfigured()?' &middot; syncs every '+Math.round(POLL_MS/1000)+'s':' &middot; sample data, API not configured')+'</div>';
     html += '</div>';
-    html += '<div class="footer-note">CDP-001 &middot; Rev 01 &middot; Engineer Trainee (Process Engineer) &middot; syncs to the shared tracking sheet every '+Math.round(POLL_MS/1000)+'s</div>';
-
     app.innerHTML = html;
-
-    if(!state.role || !state.name){ showIdentityModal(); }
 
     wireEvents();
     restoreFocus();
   }
 
-  function renderHeader(overall, pct){
-    var initialsTxt = state.name ? esc(initials(state.name)) : '?';
-    var trainee = state.meta && state.meta.TraineeName ? state.meta.TraineeName : 'Unassigned';
+  function renderHeader(){
+    var acc = state.account || {name:'', role:''};
+    var initialsTxt = acc.name ? esc(initials(acc.name)) : '?';
+    var overall = (state.view==='trainee' && state.activeTraineeId) ? overallCounts() : null;
+    var pct = overall && overall.total ? (overall.approved/overall.total*100) : 0;
+
     return '' +
     '<header class="top">' +
       '<div class="brand">' +
         '<div class="wordmark">Specialty<span>RTP</span></div>' +
         '<div class="doctitle">Engineer Trainee — Career Development Plan</div>' +
-        '<div class="docmeta" id="programInfoBtn">Doc CDP-001 &middot; Rev 01 &middot; Trainee: '+esc(trainee)+' &middot; edit program info</div>' +
+        '<div class="docmeta">' +
+          '<span>Doc CDP-001 &middot; Rev 01</span>' +
+          '<a href="'+PDF_URL+'" target="_blank" rel="noopener">View CDP-001 PDF</a>' +
+          (state.view==='trainee' && state.activeTraineeId && !isTraineeAcct() ? '<span id="backToRosterBtn" class="linklike">&larr; back to roster</span>' : '') +
+          (state.view==='trainee' && state.activeTraineeId && isSupervisorAcct() ? '<span id="programInfoBtn" class="linklike">edit trainee info</span>' : '') +
+        '</div>' +
       '</div>' +
       '<div class="top-right">' +
-        '<div class="gauge-wrap">' +
-          gaugeSvg(pct) +
-          '<div class="gauge-label">' +
-            '<span class="n">Program complete</span>' +
-            '<span class="v tabular">'+overall.approved+' of '+overall.total+' approved &middot; '+overall.submitted+' pending</span>' +
-          '</div>' +
-        '</div>' +
+        (overall ? '<div class="gauge-wrap">'+gaugeSvg(pct)+
+          '<div class="gauge-label"><span class="n">'+esc(state.trainee?state.trainee.name:'')+'</span>'+
+          '<span class="v tabular">'+overall.approved+' of '+overall.total+' approved &middot; '+overall.submitted+' pending</span></div></div>' : '') +
         '<div class="identity-chip" id="identityChip">' +
           '<div class="identity-avatar">'+initialsTxt+'</div>' +
-          '<div class="identity-text">' +
-            '<span class="name">'+(state.name?esc(state.name):'Set your name')+'</span>' +
-            '<span class="role">'+(state.role?esc(state.role):'Choose a role')+'</span>' +
-          '</div>' +
+          '<div class="identity-text"><span class="name">'+esc(acc.name||'')+'</span><span class="role">'+esc(acc.role||'')+'</span></div>' +
         '</div>' +
       '</div>' +
     '</header>';
+  }
+
+  function renderTabs(){
+    var out = '<nav class="tabs">';
+    out += '<button data-tab="roster" class="'+(state.view!=='admin'?'active':'')+'">Trainee Roster</button>';
+    if(isAdminAcct()){ out += '<button data-tab="admin" class="'+(state.view==='admin'?'active':'')+'">Manage Accounts</button>'; }
+    out += '</nav>';
+    return out;
+  }
+
+  /* ---------------- roster ---------------- */
+  function renderRoster(){
+    if(!state.roster || state.roster.length===0){
+      return '<div class="hint">No trainees yet.'+(isAdminAcct()?' Add one from <b>Manage Accounts</b>.':' Ask an admin to add one.')+'</div>';
+    }
+    var out = '<div class="roster-grid">';
+    state.roster.forEach(function(t){
+      var pct = t.total ? Math.round(t.approved/t.total*100) : 0;
+      out += '<button class="roster-card" data-open-trainee="'+esc(t.traineeId)+'">' +
+        '<div class="name">'+esc(t.name||'Unnamed')+'</div>' +
+        '<div class="start">'+(t.startDate?('Started '+esc(t.startDate)):'Start date not set')+'</div>' +
+        '<div class="bar"><i style="width:'+pct+'%"></i></div>' +
+        '<div class="stats"><span class="tabular">'+t.approved+' / '+t.total+' approved</span>' +
+        (t.submitted>0 ? '<span class="tabular" style="color:var(--pending)">'+t.submitted+' pending</span>' : '<span>'+pct+'%</span>') +
+        '</div>' +
+      '</button>';
+    });
+    out += '</div>';
+    return out;
+  }
+
+  /* ---------------- trainee detail (own or drilled-into) ---------------- */
+  function renderTraineeView(){
+    var out = '<div class="layout">';
+    out += renderRail();
+    out += renderMain();
+    out += '</div>';
+    return out;
   }
 
   function renderRail(){
@@ -495,7 +705,6 @@
         '<div class="field"><div class="k">Key output</div><div class="v">'+esc(p.output)+'</div></div>' +
       '</div>' +
     '</div>';
-
     out += renderGroup(p.id, 'activity', 'Key Activities');
     out += renderGroup(p.id, 'criterion', 'Completion Criteria');
     out += '</main>';
@@ -548,30 +757,30 @@
       if(it.ReviewNote){ out += '<div class="note-box changes">'+esc(it.ReviewNote)+'</div>'; }
     }
 
-    var isTrainee = state.role === 'Trainee';
-    var isSupervisor = SUPERVISOR_ROLES.indexOf(state.role) !== -1;
+    var canActAsTrainee = isTraineeAcct() && state.isOwnTrainee;
+    var canActAsSupervisor = isSupervisorAcct();
 
-    if(isTrainee && (it.Status==='open' || it.Status==='changes')){
+    if(canActAsTrainee && (it.Status==='open' || it.Status==='changes')){
       var draft = state.drafts[def.ItemId] !== undefined ? state.drafts[def.ItemId] : '';
       out += '<textarea class="field-input" data-note="'+def.ItemId+'" placeholder="Optional note for your supervisor (what you did, dates, who you worked with)…">'+esc(draft)+'</textarea>';
       out += '<div class="action-row"><button class="btn btn-primary" data-submit="'+def.ItemId+'">Mark done — send for approval</button></div>';
-    } else if(isTrainee && it.Status==='submitted'){
+    } else if(canActAsTrainee && it.Status==='submitted'){
       out += '<div class="hint">Waiting on '+esc(PHASES.filter(function(p){return p.id===def.Phase;})[0].reporting)+'.</div>';
       out += '<div class="action-row"><button class="btn btn-ghost" data-withdraw="'+def.ItemId+'">Withdraw submission</button></div>';
-    } else if(isTrainee && it.Status==='approved'){
+    } else if(canActAsTrainee && it.Status==='approved'){
       out += '<div class="hint">Signed off. Nice work.</div>';
     }
 
-    if(isSupervisor && it.Status==='submitted'){
+    if(canActAsSupervisor && it.Status==='submitted'){
       var rdraft = state.reviewDrafts[def.ItemId] !== undefined ? state.reviewDrafts[def.ItemId] : '';
       out += '<div class="action-row"><button class="btn btn-ok" data-approve="'+def.ItemId+'">Approve</button></div>';
       out += '<textarea class="field-input" data-reason="'+def.ItemId+'" placeholder="Reason for sending back (required to request changes)…">'+esc(rdraft)+'</textarea>';
       out += '<div class="action-row"><button class="btn btn-danger-outline" data-reject="'+def.ItemId+'">Request changes</button></div>';
-    } else if(isSupervisor && it.Status!=='submitted'){
+    } else if(canActAsSupervisor && it.Status!=='submitted'){
       out += '<div class="hint">Nothing awaiting your review on this item.</div>';
     }
 
-    if(state.role==='Viewer' || !state.role){
+    if(!canActAsTrainee && !canActAsSupervisor){
       out += '<div class="hint">Read-only view.</div>';
     }
 
@@ -579,65 +788,148 @@
     return out;
   }
 
-  /* ---------------- identity modal ---------------- */
-  function showIdentityModal(){
-    if(document.getElementById('identityVeil')) return;
+  /* ---------------- admin: manage accounts ---------------- */
+  function renderAdmin(){
+    if(!state.admin){ return '<div class="hint">Loading accounts…</div>'; }
+    var out = '';
+
+    out += '<div class="admin-section"><h2>Accounts</h2><div class="table-wrap"><table class="accounts"><thead><tr>' +
+      '<th>Name</th><th>Username</th><th>Role</th><th>Trainee</th><th>Email</th><th>Status</th><th></th>' +
+      '</tr></thead><tbody>';
+    var traineeNameById = {};
+    (state.admin.trainees||[]).forEach(function(t){ traineeNameById[t.TraineeId] = t.Name; });
+    (state.admin.accounts||[]).forEach(function(a){
+      out += '<tr>' +
+        '<td>'+esc(a.name)+'</td>' +
+        '<td class="mono">'+esc(a.username)+'</td>' +
+        '<td>'+esc(a.role)+'</td>' +
+        '<td>'+(a.traineeId ? esc(traineeNameById[a.traineeId]||a.traineeId) : '—')+'</td>' +
+        '<td>'+esc(a.email||'—')+'</td>' +
+        '<td><span class="pill active">active</span></td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn btn-ghost btn-sm" data-reset-account="'+esc(a.accountId)+'">Reset password</button> ' +
+        '</td>' +
+      '</tr>';
+    });
+    out += '</tbody></table></div></div>';
+
+    out += '<div class="admin-section"><h2>Create account</h2>' +
+      (state.adminError ? '<p class="error-text">'+esc(state.adminError)+'</p>' : '') +
+      '<div class="create-form">' +
+        '<div class="field-group"><label>Name</label><input type="text" id="newAcctName"></div>' +
+        '<div class="field-group"><label>Username</label><input type="text" id="newAcctUsername"></div>' +
+        '<div class="field-group"><label>Role</label><select id="newAcctRole">' +
+          ROLES.map(function(r){ return '<option value="'+r+'">'+r+'</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="field-group" id="newAcctStartWrap"><label>Trainee start date</label><input type="date" id="newAcctStart"></div>' +
+        '<div class="field-group"><label>Email (optional)</label><input type="email" id="newAcctEmail"></div>' +
+        '<div class="field-group"><label>Password</label><input type="text" id="newAcctPassword" placeholder="min. 6 characters"></div>' +
+        '<div class="field-group"><button class="btn btn-primary" id="createAcctBtn">Create account</button></div>' +
+      '</div>' +
+      '<p class="hint">Choosing role <b>Trainee</b> creates a new trainee record too, and seeds their checklist automatically.</p>' +
+    '</div>';
+
+    return out;
+  }
+
+  /* ---------------- identity / password modal ---------------- */
+  function showAccountModal(){
+    if(document.getElementById('acctVeil')) return;
     var veil = document.createElement('div');
-    veil.className = 'modal-veil';
-    veil.id = 'identityVeil';
+    veil.className = 'modal-veil'; veil.id = 'acctVeil';
     veil.innerHTML = '<div class="modal">' +
-      '<h2>Who’s tracking?</h2>' +
-      '<p class="sub">Your name and role are saved on this device and attached to anything you submit or approve.</p>' +
-      '<div class="field-group"><label>Name</label><input type="text" id="nameInput" value="'+esc(state.name)+'" placeholder="Full name"></div>' +
-      '<div class="field-group"><label>Role</label><select id="roleInput">' +
-        '<option value="">Select…</option>' +
-        ROLES.map(function(r){ return '<option value="'+r+'"'+(state.role===r?' selected':'')+'>'+r+'</option>'; }).join('') +
-      '</select></div>' +
-      '<div class="action-row"><button class="btn btn-primary" id="saveIdentity">Continue</button></div>' +
+      '<h2>'+esc(state.account.name)+'</h2>' +
+      '<p class="sub">'+esc(state.account.role)+'</p>' +
+      '<div class="field-group"><label>Current password</label><input type="password" id="pwOld"></div>' +
+      '<div class="field-group"><label>New password</label><input type="password" id="pwNew" placeholder="min. 6 characters"></div>' +
+      '<div id="pwError" class="error-text" hidden></div>' +
+      '<div class="action-row">' +
+        '<button class="btn btn-primary" id="pwSave">Change password</button>' +
+        '<button class="btn btn-ghost" id="pwCancel">Cancel</button>' +
+      '</div>' +
+      '<div class="action-row" style="margin-top:16px; border-top:1px solid var(--border); padding-top:14px;">' +
+        '<button class="btn btn-danger-outline" id="logoutBtn">Log out</button>' +
+      '</div>' +
     '</div>';
     document.body.appendChild(veil);
-    document.getElementById('saveIdentity').addEventListener('click', function(){
-      var n = document.getElementById('nameInput').value.trim();
-      var r = document.getElementById('roleInput').value;
-      if(!n || !r) return;
-      state.name = n; state.role = r;
-      localStorage.setItem('cdp_name', n);
-      localStorage.setItem('cdp_role', r);
-      veil.remove();
-      render();
+    document.getElementById('pwCancel').addEventListener('click', function(){ veil.remove(); });
+    document.getElementById('logoutBtn').addEventListener('click', function(){ veil.remove(); clearAuth(); render(); });
+    document.getElementById('pwSave').addEventListener('click', function(){
+      var oldPw = document.getElementById('pwOld').value;
+      var newPw = document.getElementById('pwNew').value;
+      apiPost('changePassword', {oldPassword:oldPw, newPassword:newPw}).then(function(res){
+        if(!res.ok){
+          var e = document.getElementById('pwError'); e.hidden=false; e.textContent = res.error || 'Could not change password';
+          return;
+        }
+        veil.remove();
+      });
     });
   }
 
-  function showProgramInfoModal(){
-    if(document.getElementById('programVeil')) return;
+  function showTraineeInfoModal(){
+    if(document.getElementById('infoVeil')) return;
     var veil = document.createElement('div');
-    veil.className = 'modal-veil';
-    veil.id = 'programVeil';
-    var trainee = state.meta.TraineeName || '';
-    var start = state.meta.StartDate || '';
+    veil.className = 'modal-veil'; veil.id = 'infoVeil';
+    var t = state.trainee || {};
     veil.innerHTML = '<div class="modal">' +
-      '<h2>Program info</h2>' +
-      '<p class="sub">Shown in the header for everyone viewing this tracker.</p>' +
-      '<div class="field-group"><label>Trainee name</label><input type="text" id="traineeInput" value="'+esc(trainee)+'"></div>' +
-      '<div class="field-group"><label>Program start date</label><input type="date" id="startInput" value="'+esc(start)+'"></div>' +
-      '<div class="action-row"><button class="btn btn-primary" id="saveProgram">Save</button><button class="btn btn-ghost" id="cancelProgram">Cancel</button></div>' +
+      '<h2>Trainee info</h2>' +
+      '<p class="sub">Shown in the roster and header for everyone viewing this tracker.</p>' +
+      '<div class="field-group"><label>Name</label><input type="text" id="tName" value="'+esc(t.name||'')+'"></div>' +
+      '<div class="field-group"><label>Program start date</label><input type="date" id="tStart" value="'+esc(t.startDate||'')+'"></div>' +
+      '<div class="action-row"><button class="btn btn-primary" id="tSave">Save</button><button class="btn btn-ghost" id="tCancel">Cancel</button></div>' +
     '</div>';
     document.body.appendChild(veil);
-    document.getElementById('cancelProgram').addEventListener('click', function(){ veil.remove(); });
-    document.getElementById('saveProgram').addEventListener('click', function(){
-      var t = document.getElementById('traineeInput').value.trim();
-      var s = document.getElementById('startInput').value;
+    document.getElementById('tCancel').addEventListener('click', function(){ veil.remove(); });
+    document.getElementById('tSave').addEventListener('click', function(){
+      var n = document.getElementById('tName').value.trim();
+      var s = document.getElementById('tStart').value;
       veil.remove();
-      saveMeta(t, s);
+      saveTraineeMeta(n, s);
+    });
+  }
+
+  function showResetPasswordModal(accountId){
+    if(document.getElementById('resetVeil')) return;
+    var veil = document.createElement('div');
+    veil.className = 'modal-veil'; veil.id = 'resetVeil';
+    veil.innerHTML = '<div class="modal">' +
+      '<h2>Reset password</h2>' +
+      '<p class="sub">Sets a new password for this account immediately.</p>' +
+      '<div class="field-group"><label>New password</label><input type="text" id="resetPw" placeholder="min. 6 characters"></div>' +
+      '<div id="resetError" class="error-text" hidden></div>' +
+      '<div class="action-row"><button class="btn btn-primary" id="resetSave">Set password</button><button class="btn btn-ghost" id="resetCancel">Cancel</button></div>' +
+    '</div>';
+    document.body.appendChild(veil);
+    document.getElementById('resetCancel').addEventListener('click', function(){ veil.remove(); });
+    document.getElementById('resetSave').addEventListener('click', function(){
+      var pw = document.getElementById('resetPw').value;
+      apiPost('resetPassword', {accountId:accountId, newPassword:pw}).then(function(res){
+        if(!res.ok){ var e=document.getElementById('resetError'); e.hidden=false; e.textContent=res.error||'Failed'; return; }
+        veil.remove();
+      });
     });
   }
 
   /* ---------------- events ---------------- */
   function wireEvents(){
     var chip = document.getElementById('identityChip');
-    if(chip) chip.addEventListener('click', showIdentityModal);
-    var infoBtn = document.getElementById('programInfoBtn');
-    if(infoBtn) infoBtn.addEventListener('click', showProgramInfoModal);
+    if(chip) chip.addEventListener('click', showAccountModal);
+    var back = document.getElementById('backToRosterBtn');
+    if(back) back.addEventListener('click', backToRoster);
+    var info = document.getElementById('programInfoBtn');
+    if(info) info.addEventListener('click', showTraineeInfoModal);
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function(btn){
+      btn.addEventListener('click', function(){
+        var tab = btn.getAttribute('data-tab');
+        if(tab==='admin') openAdmin(); else backToRoster();
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-open-trainee]'), function(btn){
+      btn.addEventListener('click', function(){ openTrainee(btn.getAttribute('data-open-trainee')); });
+    });
 
     Array.prototype.forEach.call(document.querySelectorAll('.phase-card'), function(btn){
       btn.addEventListener('click', function(){ state.activePhase = btn.getAttribute('data-phase'); render(); });
@@ -668,6 +960,36 @@
     bindClick('[data-withdraw]', 'data-withdraw', function(def){ withdraw(def); });
     bindClick('[data-approve]', 'data-approve', function(def){ approve(def); });
     bindClick('[data-reject]', 'data-reject', function(def){ requestChanges(def); });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-reset-account]'), function(btn){
+      btn.addEventListener('click', function(){ showResetPasswordModal(btn.getAttribute('data-reset-account')); });
+    });
+
+    var roleSel = document.getElementById('newAcctRole');
+    var startWrap = document.getElementById('newAcctStartWrap');
+    if(roleSel && startWrap){
+      var syncStartVisibility = function(){ startWrap.style.display = roleSel.value==='Trainee' ? '' : 'none'; };
+      syncStartVisibility();
+      roleSel.addEventListener('change', syncStartVisibility);
+    }
+    var createBtn = document.getElementById('createAcctBtn');
+    if(createBtn){
+      createBtn.addEventListener('click', function(){
+        var payload = {
+          name: document.getElementById('newAcctName').value.trim(),
+          username: document.getElementById('newAcctUsername').value.trim(),
+          role: document.getElementById('newAcctRole').value,
+          email: document.getElementById('newAcctEmail').value.trim(),
+          password: document.getElementById('newAcctPassword').value,
+          startDate: document.getElementById('newAcctStart').value
+        };
+        apiPost('createAccount', payload).then(function(res){
+          if(!res.ok){ state.adminError = res.error || 'Could not create account'; render(); return; }
+          state.adminError = '';
+          loadAdmin();
+        });
+      });
+    }
   }
 
   function bindClick(sel, attr, fn){
@@ -689,8 +1011,9 @@
   }
 
   /* ---------------- boot ---------------- */
-  loadState();
-  setInterval(loadState, POLL_MS);
+  if(state.token) { state.view = 'roster'; loadState(); }
+  render();
+  setInterval(function(){ if(state.token || !apiConfigured()) loadState(); }, POLL_MS);
 })();
 </script>
 </body>
