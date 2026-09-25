@@ -285,7 +285,8 @@
     loaded: false,
     offline: false,
     loginError: '',
-    adminError: ''
+    adminError: '',
+    newAcctDraft: {name:'', username:'', role:'Trainee', startDate:'', email:'', password:''}
   };
   var focusRestore = null;
   var itemDefsCache = {};
@@ -813,17 +814,18 @@
     });
     out += '</tbody></table></div></div>';
 
+    var d = state.newAcctDraft;
     out += '<div class="admin-section"><h2>Create account</h2>' +
       (state.adminError ? '<p class="error-text">'+esc(state.adminError)+'</p>' : '') +
       '<div class="create-form">' +
-        '<div class="field-group"><label>Name</label><input type="text" id="newAcctName"></div>' +
-        '<div class="field-group"><label>Username</label><input type="text" id="newAcctUsername"></div>' +
-        '<div class="field-group"><label>Role</label><select id="newAcctRole">' +
-          ROLES.map(function(r){ return '<option value="'+r+'">'+r+'</option>'; }).join('') +
+        '<div class="field-group"><label>Name</label><input type="text" id="newAcctName" data-draft="name" value="'+esc(d.name)+'"></div>' +
+        '<div class="field-group"><label>Username</label><input type="text" id="newAcctUsername" data-draft="username" value="'+esc(d.username)+'"></div>' +
+        '<div class="field-group"><label>Role</label><select id="newAcctRole" data-draft="role">' +
+          ROLES.map(function(r){ return '<option value="'+r+'"'+(d.role===r?' selected':'')+'>'+r+'</option>'; }).join('') +
         '</select></div>' +
-        '<div class="field-group" id="newAcctStartWrap"><label>Trainee start date</label><input type="date" id="newAcctStart"></div>' +
-        '<div class="field-group"><label>Email (optional)</label><input type="email" id="newAcctEmail"></div>' +
-        '<div class="field-group"><label>Password</label><input type="text" id="newAcctPassword" placeholder="min. 6 characters"></div>' +
+        '<div class="field-group" id="newAcctStartWrap"><label>Trainee start date</label><input type="date" id="newAcctStart" data-draft="startDate" value="'+esc(d.startDate)+'"></div>' +
+        '<div class="field-group"><label>Email (optional)</label><input type="email" id="newAcctEmail" data-draft="email" value="'+esc(d.email)+'"></div>' +
+        '<div class="field-group"><label>Password</label><input type="text" id="newAcctPassword" data-draft="password" placeholder="min. 6 characters" value="'+esc(d.password)+'"></div>' +
         '<div class="field-group"><button class="btn btn-primary" id="createAcctBtn">Create account</button></div>' +
       '</div>' +
       '<p class="hint">Choosing role <b>Trainee</b> creates a new trainee record too, and seeds their checklist automatically.</p>' +
@@ -965,6 +967,11 @@
       btn.addEventListener('click', function(){ showResetPasswordModal(btn.getAttribute('data-reset-account')); });
     });
 
+    Array.prototype.forEach.call(document.querySelectorAll('[data-draft]'), function(el){
+      el.addEventListener('input', function(){ state.newAcctDraft[el.getAttribute('data-draft')] = el.value; });
+      el.addEventListener('change', function(){ state.newAcctDraft[el.getAttribute('data-draft')] = el.value; });
+    });
+
     var roleSel = document.getElementById('newAcctRole');
     var startWrap = document.getElementById('newAcctStartWrap');
     if(roleSel && startWrap){
@@ -975,17 +982,15 @@
     var createBtn = document.getElementById('createAcctBtn');
     if(createBtn){
       createBtn.addEventListener('click', function(){
+        var d = state.newAcctDraft;
         var payload = {
-          name: document.getElementById('newAcctName').value.trim(),
-          username: document.getElementById('newAcctUsername').value.trim(),
-          role: document.getElementById('newAcctRole').value,
-          email: document.getElementById('newAcctEmail').value.trim(),
-          password: document.getElementById('newAcctPassword').value,
-          startDate: document.getElementById('newAcctStart').value
+          name: d.name.trim(), username: d.username.trim(), role: d.role,
+          email: d.email.trim(), password: d.password, startDate: d.startDate
         };
         apiPost('createAccount', payload).then(function(res){
           if(!res.ok){ state.adminError = res.error || 'Could not create account'; render(); return; }
           state.adminError = '';
+          state.newAcctDraft = {name:'', username:'', role:'Trainee', startDate:'', email:'', password:''};
           loadAdmin();
         });
       });
@@ -1013,7 +1018,13 @@
   /* ---------------- boot ---------------- */
   if(state.token) { state.view = 'roster'; loadState(); }
   render();
-  setInterval(function(){ if(state.token || !apiConfigured()) loadState(); }, POLL_MS);
+  setInterval(function(){
+    // Skip while on Manage Accounts — that tab has no live roster data to
+    // refresh, and re-rendering it mid-poll would wipe whatever the admin
+    // is currently typing into the create-account form.
+    if(state.view==='admin') return;
+    if(state.token || !apiConfigured()) loadState();
+  }, POLL_MS);
 })();
 </script>
 </body>
