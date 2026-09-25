@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Engineer Trainee CDP Tracker</title>
+<title>Career Development Tracker</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
@@ -60,11 +60,8 @@
     flex-wrap:wrap;
   }
   .brand{ display:flex; flex-direction:column; gap:6px; }
-  .brand .wordmark{
-    font-family:var(--font-display); font-weight:800; font-size:26px; letter-spacing:.5px;
-    color:var(--navy); text-transform:uppercase; line-height:1;
-  }
-  .brand .wordmark span{ color:var(--amber); }
+  .brand .wordmark{ line-height:1; }
+  .brand .wordmark img{ display:block; height:34px; width:auto; }
   .brand .doctitle{ font-size:19px; font-weight:600; color:var(--ink); }
   .brand .docmeta{
     display:flex; align-items:center; gap:10px; flex-wrap:wrap;
@@ -192,8 +189,8 @@
   /* ---- login page ---- */
   .login-shell{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
   .login-card{ width:100%; max-width:380px; background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:32px 30px; box-shadow:var(--shadow); }
-  .login-card .wordmark{ font-family:var(--font-display); font-weight:800; font-size:24px; color:var(--navy); text-transform:uppercase; margin-bottom:4px; }
-  .login-card .wordmark span{ color:var(--amber); }
+  .login-card .wordmark{ margin-bottom:14px; }
+  .login-card .wordmark img{ display:block; height:36px; width:auto; }
   .login-card h1{ font-family:var(--font-display); font-weight:700; font-size:20px; margin:0 0 20px; }
   .login-card .btn-primary{ width:100%; padding:10px 14px; font-size:13.5px; }
 
@@ -222,6 +219,24 @@
   .pill.inactive{ background:var(--muted-bg); color:var(--ink-faint); }
   .table-wrap{ overflow-x:auto; }
   .create-form{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; align-items:end; }
+
+  /* ---- manage program (key objectives / hierarchy) ---- */
+  .program-phase{ background:var(--surface-2); border:1px solid var(--border); border-radius:12px; margin-bottom:12px; overflow:hidden; }
+  .program-phase-head{ display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; }
+  .program-phase-head .tag{ font-family:var(--font-display); font-weight:800; font-size:18px; color:var(--navy); }
+  .program-phase-head .title{ font-weight:600; font-size:13.5px; flex:1; }
+  .program-phase-head .range{ font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); text-transform:uppercase; }
+  .program-phase-body{ padding:0 14px 16px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:16px; }
+  .program-sub h3{ font-family:var(--font-display); font-weight:700; font-size:14px; text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px; color:var(--ink-soft); }
+  .program-item-row{ display:flex; align-items:flex-start; gap:8px; padding:8px 0; border-bottom:1px solid var(--border); }
+  .program-item-row:last-child{ border-bottom:none; }
+  .program-item-row .kindtag{ font-family:var(--font-mono); font-size:10px; text-transform:uppercase; color:var(--ink-faint); padding:2px 6px; border:1px solid var(--border); border-radius:5px; flex-shrink:0; margin-top:2px; }
+  .program-item-row textarea{ flex:1; min-height:38px; }
+  .reviewer-chip{ display:inline-flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:4px 6px 4px 10px; font-size:12px; margin:2px 6px 2px 0; }
+  .reviewer-chip button{ background:none; border:none; color:var(--ink-faint); font-size:13px; line-height:1; padding:2px; }
+  .reviewer-chip button:hover{ color:var(--changes); }
+  .inline-add-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  .inline-add-row select, .inline-add-row input{ border:1px solid var(--border); border-radius:8px; padding:7px 9px; font-size:12.5px; font-family:var(--font-body); background:var(--surface); color:var(--ink); }
 </style>
 </head>
 <body>
@@ -237,20 +252,19 @@
   var API_URL = 'https://script.google.com/macros/s/AKfycbycNP1fIScDrUBtPU8mU1TufHomYGjxaIA7KOxh-TIn-pMMzl9X9QaIYlSmXgoK1CNlIA/exec';
   var POLL_MS = 15000;
   var PDF_URL = './CDP-001.pdf';
+  var LOGO_URL = './assets/logo.png';
 
-  var PHASES = [
-    { id:'1a', tag:'1A', title:'Core Station Rotations', range:'Months 1–3', location:'Production Floor',
-      reporting:'Manufacturing Manager / VP Production & Engineering', output:'Competency in Baseline, Braidline, Coverline operations; equipment familiarity',
-      objective:'Build hands-on working knowledge of all three primary production stages and supporting maintenance activities. Develop the foundational shop floor literacy required to credibly engage in process improvement work in Phase 2.' },
-    { id:'1b', tag:'1B', title:'Full Cycle, Field & Supply Chain', range:'Months 3–6', location:'Production Floor + Field',
-      reporting:'Manufacturing Manager / VP Production & Engineering', output:'Quality/testing proficiency; inventory & supply chain literacy; minimum 1 field install',
-      objective:'Deepen production competency across all stations, gain exposure to quality/testing leadership functions, complete supply chain and inventory literacy, and participate in at least one field installation to understand the end-to-end product lifecycle.' },
-    { id:'2', tag:'2', title:'Process Improvement', range:'Months 6–18', location:'Office + Shop Floor',
-      reporting:'VP Production & Engineering', output:'Documented improvement projects; project plan portfolio; shop efficiency metrics',
-      objective:'Transition from operator-level contributor to a hybrid engineering function. Leverage shop floor knowledge to identify, plan, and implement measurable process and equipment improvements. Develop project management capability in a real operational context.' },
-    { id:'3', tag:'3', title:'Design, Planning & Technical Development', range:'Months 18–24', location:'Office + Cross-functional',
-      reporting:'CTO / VP Production & Engineering', output:'Technical design contributions; planning documents; readiness for senior role',
-      objective:'Develop as a credible technical contributor in product design, process engineering, and capital planning. Support the CTO and VP Production & Engineering in design activities, process validation, and engineering documentation.' }
+  // Key Objectives (formerly a hardcoded "phases" list) are now admin-owned
+  // program data, loaded from the API on every trainee/roster fetch. This
+  // array is only a fallback so the offline/sample view still shows
+  // something real when the API isn't configured yet.
+  var SAMPLE_PHASES = [
+    { id:'onboard', tag:'1', title:'Onboarding & Foundations', range:'Months 1–2', location:'—',
+      reporting:'Direct Manager', output:'Ramped on role fundamentals and team norms',
+      objective:'Build core competency in the fundamentals of the role, the tools, and the organization.' },
+    { id:'growth', tag:'2', title:'Growth & Ownership', range:'Months 3–6', location:'—',
+      reporting:'Direct Manager', output:'Independent ownership of core responsibilities',
+      objective:'Take ownership of core responsibilities with decreasing supervision, and begin contributing beyond the immediate role.' }
   ];
 
   var ROLES = ['Trainee','Manufacturing Manager','VP Production & Engineering','CTO','Admin','Viewer'];
@@ -259,26 +273,35 @@
   // Sample rows shown before the sheet API is configured / while offline,
   // so the page never opens to an empty shell.
   var SAMPLE_ITEMS = [
-    {ItemId:'1a-a1', Phase:'1a', Kind:'activity', Text:'Baseline Station (max. 3 weeks) — extrusion parameters, line speed, material handling, dimensional inspection with calipers & Pi tape, production records, shift handover', Status:'approved', Note:'Completed all three weeks, signed off by shift lead.', SubmittedByName:'Sample Trainee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-02T14:00:00Z', ReviewedByName:'Sample Manager', ReviewedByRole:'Manufacturing Manager', ReviewedAt:'2026-06-03T09:00:00Z', ReviewNote:''},
-    {ItemId:'1a-a2', Phase:'1a', Kind:'activity', Text:'Braidline Station (max. 3 weeks) — braid angle & fiber tension, overlap/coverage, fiber count verification, in-process inspection per QWI QC 004', Status:'submitted', Note:'Finished rotation, ready for review.', SubmittedByName:'Sample Trainee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-10T16:00:00Z', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''},
-    {ItemId:'1a-c1', Phase:'1a', Kind:'criterion', Text:'Can set up, operate, and complete production records at all three stations without constant supervision', Status:'open', Note:'', SubmittedByName:'', SubmittedByRole:'', SubmittedAt:'', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''}
+    {ItemId:'ob-a1', Phase:'onboard', Kind:'activity', Text:'Complete orientation and meet your core team', Status:'approved', Note:'Done in week one.', SubmittedByName:'Sample Employee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-02T14:00:00Z', ReviewedByName:'Sample Manager', ReviewedByRole:'Manufacturing Manager', ReviewedAt:'2026-06-03T09:00:00Z', ReviewNote:''},
+    {ItemId:'ob-a2', Phase:'onboard', Kind:'activity', Text:'Shadow each core workflow the role touches', Status:'submitted', Note:'Finished shadowing, ready for review.', SubmittedByName:'Sample Employee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-10T16:00:00Z', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''},
+    {ItemId:'ob-c1', Phase:'onboard', Kind:'criterion', Text:'Can complete core tasks without constant supervision', Status:'open', Note:'', SubmittedByName:'', SubmittedByRole:'', SubmittedAt:'', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''}
   ];
   var SAMPLE_ROSTER = [
-    {traineeId:'sample-1', name:'Sample Trainee', startDate:'2026-05-01', status:'active', total:3, approved:1, submitted:1}
+    {traineeId:'sample-1', name:'Sample Employee', startDate:'2026-05-01', status:'active', total:3, approved:1, submitted:1}
   ];
 
   /* ---------------- state ---------------- */
   var state = {
     token: localStorage.getItem('cdp_token') || '',
     account: JSON.parse(localStorage.getItem('cdp_account') || 'null'),
-    view: 'roster',        // 'roster' | 'trainee' | 'admin'
+    view: 'roster',        // 'roster' | 'trainee' | 'admin' | 'program'
     activeTraineeId: '',
     isOwnTrainee: false,
-    activePhase: '1a',
+    activePhase: '',
+    phases: SAMPLE_PHASES,
+    reviewersByPhase: null, // {phaseId: [{accountId,name,role}, ...]} for the active employee, once loaded
     items: {},
     trainee: null,
     roster: [],
     admin: null,           // {accounts, trainees} once loaded
+    program: null,          // {phases, itemDefs, reviewerAssignments, accounts, trainees} once loaded
+    expandedProgram: {},
+    phaseDrafts: {},
+    newItemDraft: {},
+    newPhaseDraft: {title:'', tag:'', range:'', location:'', reporting:'', output:'', objective:''},
+    newReviewerDraft: {},
+    programError: '',
     expanded: {},
     drafts: {},
     reviewDrafts: {},
@@ -295,6 +318,19 @@
   function isTraineeAcct(){ return state.account && state.account.role === 'Trainee'; }
   function isSupervisorAcct(){ return state.account && SUPERVISOR_ROLES.indexOf(state.account.role) !== -1; }
   function isAdminAcct(){ return state.account && state.account.role === 'Admin'; }
+  // Whether the signed-in account may review items in a given Key
+  // Objective for the employee currently being viewed. Mirrors the
+  // backend's canReview_: an admin-assigned hierarchy (state.reviewersByPhase)
+  // wins when set for this phase; otherwise any supervisor-role account can
+  // review, matching the server's fallback. The server re-checks this on
+  // every write, so this is only for showing/hiding buttons.
+  function isReviewerForPhase(phaseId){
+    if(isAdminAcct()) return true;
+    if(state.reviewersByPhase && state.reviewersByPhase[phaseId]){
+      return state.reviewersByPhase[phaseId].some(function(r){ return state.account && r.accountId===state.account.accountId; });
+    }
+    return isSupervisorAcct();
+  }
 
   function itemsForPhase(phaseId){
     return Object.keys(itemDefsCache)
@@ -415,15 +451,23 @@
       .catch(function(err){ return {ok:false, error:String(err)}; });
   }
 
+  function ensureActivePhase(){
+    if(!state.phases || !state.phases.length){ state.activePhase = ''; return; }
+    if(!state.activePhase || !state.phases.some(function(p){ return p.id===state.activePhase; })){
+      state.activePhase = state.phases[0].id;
+    }
+  }
+
   function loadState(){
     if(!apiConfigured()){
       if(!state.loaded){
         applyFetchedItems(SAMPLE_ITEMS);
-        state.trainee = {traineeId:'sample-1', name:'Sample Trainee', startDate:'2026-05-01'};
+        state.trainee = {traineeId:'sample-1', name:'Sample Employee', startDate:'2026-05-01'};
         state.roster = SAMPLE_ROSTER;
         state.activeTraineeId = 'sample-1';
         state.loaded = true;
       }
+      ensureActivePhase();
       state.offline = true;
       render();
       return;
@@ -440,21 +484,25 @@
         state.offline = true; render(); return;
       }
       state.offline = false; state.loaded = true;
+      if(Array.isArray(res.phases) && res.phases.length){ state.phases = res.phases; }
       if(res.mode==='trainee'){
         applyFetchedItems(res.items);
         state.trainee = res.trainee;
         state.activeTraineeId = res.trainee ? res.trainee.traineeId : state.account.traineeId;
         state.isOwnTrainee = true;
+        state.reviewersByPhase = res.reviewersByPhase || null;
         state.view = 'trainee';
       } else if(res.mode==='detail'){
         applyFetchedItems(res.items);
         state.trainee = res.trainee;
         state.isOwnTrainee = false;
+        state.reviewersByPhase = res.reviewersByPhase || null;
         state.view = 'trainee';
       } else if(res.mode==='roster'){
         state.roster = Array.isArray(res.trainees) ? res.trainees : [];
-        if(state.view!=='admin') state.view = 'roster';
+        if(state.view!=='admin' && state.view!=='program') state.view = 'roster';
       }
+      ensureActivePhase();
       render();
     }).catch(function(){ state.offline = true; render(); });
   }
@@ -494,6 +542,25 @@
     });
   }
 
+  function openProgram(){
+    state.view = 'program';
+    render();
+    loadProgram();
+  }
+  function loadProgram(){
+    apiPost('listProgram', {}).then(function(res){
+      if(!res.ok){ if(res.error==='auth'){ clearAuth(); } state.programError = res.error||''; render(); return; }
+      state.program = {
+        phases: (Array.isArray(res.phases)?res.phases:[]).slice().sort(function(a,b){ return (a.order||0)-(b.order||0); }),
+        itemDefs: Array.isArray(res.itemDefs)?res.itemDefs:[],
+        reviewerAssignments: Array.isArray(res.reviewerAssignments)?res.reviewerAssignments:[],
+        accounts: Array.isArray(res.accounts)?res.accounts:[],
+        trainees: Array.isArray(res.trainees)?res.trainees:[]
+      };
+      state.programError=''; render();
+    });
+  }
+
   /* ---------------- actions ---------------- */
   function applyLocal(id, patch){
     state.items[id] = Object.assign({}, getItem(id), patch);
@@ -523,6 +590,17 @@
     render();
     apiPost('approve', {itemId:def.ItemId, traineeId:state.activeTraineeId}).then(function(res){
       if(res.ok) applyLocal(def.ItemId, res.item);
+      render();
+    });
+  }
+  function markComplete(def){
+    var note = (state.reviewDrafts[def.ItemId] || '').trim();
+    var now = new Date().toISOString();
+    applyLocal(def.ItemId, { Status:'approved', Note:note, SubmittedByName:state.account.name, SubmittedByRole:state.account.role, SubmittedAt:now, ReviewedByName:state.account.name, ReviewedByRole:state.account.role, ReviewedAt:now, ReviewNote:'' });
+    delete state.reviewDrafts[def.ItemId];
+    render();
+    apiPost('markComplete', {itemId:def.ItemId, traineeId:state.activeTraineeId, note:note}).then(function(res){
+      if(res.ok) applyLocal(def.ItemId, res.item); else if(res.error==='auth'){ clearAuth(); }
       render();
     });
   }
@@ -562,8 +640,8 @@
     var app = document.getElementById('app');
     app.innerHTML =
       '<div class="login-shell"><div class="login-card">' +
-        '<div class="wordmark">Specialty<span>RTP</span></div>' +
-        '<h1>Engineer Trainee CDP Tracker</h1>' +
+        '<div class="wordmark"><img src="'+LOGO_URL+'" alt="Company logo"></div>' +
+        '<h1>Career Development Tracker</h1>' +
         '<div class="field-group"><label>Username</label><input type="text" id="loginUser" autocomplete="username"></div>' +
         '<div class="field-group"><label>Password</label><input type="password" id="loginPass" autocomplete="current-password"></div>' +
         (state.loginError ? '<p class="error-text">'+esc(state.loginError)+'</p>' : '') +
@@ -593,13 +671,15 @@
 
     if(state.view==='admin' && isAdminAcct()){
       html += renderAdmin();
+    } else if(state.view==='program' && isAdminAcct()){
+      html += renderProgram();
     } else if(state.view==='trainee' && state.activeTraineeId){
       html += renderTraineeView();
     } else {
       html += renderRoster();
     }
 
-    html += '<div class="footer-note">CDP-001 &middot; Rev 01 &middot; Engineer Trainee (Process Engineer)'+(apiConfigured()?' &middot; syncs every '+Math.round(POLL_MS/1000)+'s':' &middot; sample data, API not configured')+'</div>';
+    html += '<div class="footer-note">Career Development Tracker &middot; Doc CDP-001 &middot; Rev 01'+(apiConfigured()?' &middot; syncs every '+Math.round(POLL_MS/1000)+'s':' &middot; sample data, API not configured')+'</div>';
     html += '</div>';
     app.innerHTML = html;
 
@@ -616,13 +696,13 @@
     return '' +
     '<header class="top">' +
       '<div class="brand">' +
-        '<div class="wordmark">Specialty<span>RTP</span></div>' +
-        '<div class="doctitle">Engineer Trainee — Career Development Plan</div>' +
+        '<div class="wordmark"><img src="'+LOGO_URL+'" alt="Company logo"></div>' +
+        '<div class="doctitle">Career Development Plan</div>' +
         '<div class="docmeta">' +
           '<span>Doc CDP-001 &middot; Rev 01</span>' +
           '<a href="'+PDF_URL+'" target="_blank" rel="noopener">View CDP-001 PDF</a>' +
           (state.view==='trainee' && state.activeTraineeId && !isTraineeAcct() ? '<span id="backToRosterBtn" class="linklike">&larr; back to roster</span>' : '') +
-          (state.view==='trainee' && state.activeTraineeId && isSupervisorAcct() ? '<span id="programInfoBtn" class="linklike">edit trainee info</span>' : '') +
+          (state.view==='trainee' && state.activeTraineeId && isSupervisorAcct() ? '<span id="programInfoBtn" class="linklike">edit employee info</span>' : '') +
         '</div>' +
       '</div>' +
       '<div class="top-right">' +
@@ -639,8 +719,11 @@
 
   function renderTabs(){
     var out = '<nav class="tabs">';
-    out += '<button data-tab="roster" class="'+(state.view!=='admin'?'active':'')+'">Trainee Roster</button>';
-    if(isAdminAcct()){ out += '<button data-tab="admin" class="'+(state.view==='admin'?'active':'')+'">Manage Accounts</button>'; }
+    out += '<button data-tab="roster" class="'+(state.view!=='admin' && state.view!=='program'?'active':'')+'">Team Roster</button>';
+    if(isAdminAcct()){
+      out += '<button data-tab="admin" class="'+(state.view==='admin'?'active':'')+'">Manage Accounts</button>';
+      out += '<button data-tab="program" class="'+(state.view==='program'?'active':'')+'">Manage Program</button>';
+    }
     out += '</nav>';
     return out;
   }
@@ -648,7 +731,7 @@
   /* ---------------- roster ---------------- */
   function renderRoster(){
     if(!state.roster || state.roster.length===0){
-      return '<div class="hint">No trainees yet.'+(isAdminAcct()?' Add one from <b>Manage Accounts</b>.':' Ask an admin to add one.')+'</div>';
+      return '<div class="hint">No one on the roster yet.'+(isAdminAcct()?' Add someone from <b>Manage Accounts</b>.':' Ask an admin to add someone.')+'</div>';
     }
     var out = '<div class="roster-grid">';
     state.roster.forEach(function(t){
@@ -677,7 +760,7 @@
 
   function renderRail(){
     var out = '<nav class="rail">';
-    PHASES.forEach(function(p){
+    state.phases.forEach(function(p){
       var c = counts(p.id);
       var pct = c.total ? Math.round(c.approved/c.total*100) : 0;
       out += '<button class="phase-card'+(state.activePhase===p.id?' active':'')+'" data-phase="'+p.id+'">' +
@@ -694,16 +777,23 @@
   }
 
   function renderMain(){
-    var p = PHASES.filter(function(x){ return x.id===state.activePhase; })[0];
+    var p = state.phases.filter(function(x){ return x.id===state.activePhase; })[0];
     var out = '<main class="content">';
+    if(!p){
+      out += '<div class="hint">No Key Objectives set up yet.'+(isAdminAcct()?' Add one from <b>Manage Program</b>.':' Ask an admin to add one.')+'</div></main>';
+      return out;
+    }
+    var reviewers = (state.reviewersByPhase && state.reviewersByPhase[p.id]) || [];
+    var reviewerNames = reviewers.map(function(r){ return r.name + (r.role ? ' ('+r.role+')' : ''); }).join(', ');
     out += '<div class="phase-header">' +
-      '<div class="eyebrow">Phase '+p.tag+' &middot; '+esc(p.range)+'</div>' +
+      '<div class="eyebrow">Key Objective '+esc(p.tag)+' &middot; '+esc(p.range)+'</div>' +
       '<h1>'+esc(p.title)+'</h1>' +
       '<p class="objective">'+esc(p.objective)+'</p>' +
       '<div class="info-grid">' +
         '<div class="field"><div class="k">Location</div><div class="v">'+esc(p.location)+'</div></div>' +
         '<div class="field"><div class="k">Reports to</div><div class="v">'+esc(p.reporting)+'</div></div>' +
         '<div class="field"><div class="k">Key output</div><div class="v">'+esc(p.output)+'</div></div>' +
+        (reviewerNames ? '<div class="field"><div class="k">Reviewed by</div><div class="v">'+esc(reviewerNames)+'</div></div>' : '') +
       '</div>' +
     '</div>';
     out += renderGroup(p.id, 'activity', 'Key Activities');
@@ -759,14 +849,15 @@
     }
 
     var canActAsTrainee = isTraineeAcct() && state.isOwnTrainee;
-    var canActAsSupervisor = isSupervisorAcct();
+    var canActAsSupervisor = isReviewerForPhase(def.Phase);
 
     if(canActAsTrainee && (it.Status==='open' || it.Status==='changes')){
       var draft = state.drafts[def.ItemId] !== undefined ? state.drafts[def.ItemId] : '';
-      out += '<textarea class="field-input" data-note="'+def.ItemId+'" placeholder="Optional note for your supervisor (what you did, dates, who you worked with)…">'+esc(draft)+'</textarea>';
+      out += '<textarea class="field-input" data-note="'+def.ItemId+'" placeholder="Optional note for your reviewer (what you did, dates, who you worked with)…">'+esc(draft)+'</textarea>';
       out += '<div class="action-row"><button class="btn btn-primary" data-submit="'+def.ItemId+'">Mark done — send for approval</button></div>';
     } else if(canActAsTrainee && it.Status==='submitted'){
-      out += '<div class="hint">Waiting on '+esc(PHASES.filter(function(p){return p.id===def.Phase;})[0].reporting)+'.</div>';
+      var reviewersHint = (state.reviewersByPhase && state.reviewersByPhase[def.Phase] || []).map(function(r){ return r.name; }).join(', ');
+      out += '<div class="hint">Waiting on '+esc(reviewersHint || 'your reviewer')+'.</div>';
       out += '<div class="action-row"><button class="btn btn-ghost" data-withdraw="'+def.ItemId+'">Withdraw submission</button></div>';
     } else if(canActAsTrainee && it.Status==='approved'){
       out += '<div class="hint">Signed off. Nice work.</div>';
@@ -777,8 +868,14 @@
       out += '<div class="action-row"><button class="btn btn-ok" data-approve="'+def.ItemId+'">Approve</button></div>';
       out += '<textarea class="field-input" data-reason="'+def.ItemId+'" placeholder="Reason for sending back (required to request changes)…">'+esc(rdraft)+'</textarea>';
       out += '<div class="action-row"><button class="btn btn-danger-outline" data-reject="'+def.ItemId+'">Request changes</button></div>';
-    } else if(canActAsSupervisor && it.Status!=='submitted'){
-      out += '<div class="hint">Nothing awaiting your review on this item.</div>';
+    } else if(canActAsSupervisor && (it.Status==='open' || it.Status==='changes')){
+      // Reviewers can finish an item themselves, without waiting on the
+      // employee to submit it first.
+      var mdraft = state.reviewDrafts[def.ItemId] !== undefined ? state.reviewDrafts[def.ItemId] : '';
+      out += '<textarea class="field-input" data-reason="'+def.ItemId+'" placeholder="Optional note (visible to the employee)…">'+esc(mdraft)+'</textarea>';
+      out += '<div class="action-row"><button class="btn btn-ok" data-markcomplete="'+def.ItemId+'">Mark complete</button></div>';
+    } else if(canActAsSupervisor && it.Status==='approved'){
+      out += '<div class="hint">Signed off.</div>';
     }
 
     if(!canActAsTrainee && !canActAsSupervisor){
@@ -831,6 +928,135 @@
       '<p class="hint">Choosing role <b>Trainee</b> creates a new trainee record too, and seeds their checklist automatically.</p>' +
     '</div>';
 
+    return out;
+  }
+
+  /* ---------------- admin: manage program (Key Objectives, items, hierarchy) ---------------- */
+  function renderProgram(){
+    if(!state.program){ return '<div class="hint">Loading program…</div>'; }
+    var out = '';
+
+    out += '<div class="admin-section"><h2>Key Objectives</h2>';
+    if(state.programError){ out += '<p class="error-text">'+esc(state.programError)+'</p>'; }
+    if(state.program.phases.length===0){ out += '<div class="hint">No Key Objectives yet — create one below.</div>'; }
+    state.program.phases.forEach(function(p){ out += renderProgramPhase(p); });
+    out += '</div>';
+
+    var np = state.newPhaseDraft;
+    out += '<div class="admin-section"><h2>Create Key Objective</h2>' +
+      '<div class="create-form">' +
+        '<div class="field-group"><label>Title</label><input type="text" data-newphase="title" value="'+esc(np.title)+'"></div>' +
+        '<div class="field-group"><label>Tag</label><input type="text" data-newphase="tag" placeholder="e.g. 1, 2A" value="'+esc(np.tag)+'"></div>' +
+        '<div class="field-group"><label>Timeframe</label><input type="text" data-newphase="range" placeholder="e.g. Months 1–3" value="'+esc(np.range)+'"></div>' +
+        '<div class="field-group"><label>Location</label><input type="text" data-newphase="location" value="'+esc(np.location)+'"></div>' +
+        '<div class="field-group"><label>Reports to</label><input type="text" data-newphase="reporting" value="'+esc(np.reporting)+'"></div>' +
+        '<div class="field-group"><label>Key output</label><input type="text" data-newphase="output" value="'+esc(np.output)+'"></div>' +
+        '<div class="field-group" style="grid-column:1/-1"><label>Description</label><textarea class="field-input" data-newphase="objective">'+esc(np.objective)+'</textarea></div>' +
+        '<div class="field-group"><button class="btn btn-primary" id="createPhaseBtn">Create Key Objective</button></div>' +
+      '</div>' +
+    '</div>';
+
+    return out;
+  }
+
+  function renderProgramPhase(p){
+    if(!state.phaseDrafts[p.id]){
+      state.phaseDrafts[p.id] = {title:p.title, tag:p.tag, range:p.range, location:p.location, reporting:p.reporting, output:p.output, objective:p.objective};
+    }
+    var d = state.phaseDrafts[p.id];
+    var isOpen = !!state.expandedProgram[p.id];
+    var items = state.program.itemDefs.filter(function(i){ return i.Phase===p.id; }).sort(function(a,b){ return (a.Order||0)-(b.Order||0); });
+
+    var out = '<div class="program-phase">';
+    out += '<div class="program-phase-head" data-toggleprogram="'+esc(p.id)+'">' +
+        '<span class="tag">'+esc(p.tag)+'</span>' +
+        '<span class="title">'+esc(p.title)+'</span>' +
+        '<span class="range">'+esc(p.range)+'</span>' +
+        '<span class="chev">'+icon('chev')+'</span>' +
+      '</div>';
+
+    if(isOpen){
+      out += '<div class="program-phase-body">';
+
+      out += '<div class="program-sub"><h3>Details</h3><div class="create-form">' +
+          '<div class="field-group"><label>Title</label><input type="text" data-phasefield="'+esc(p.id)+':title" value="'+esc(d.title)+'"></div>' +
+          '<div class="field-group"><label>Tag</label><input type="text" data-phasefield="'+esc(p.id)+':tag" value="'+esc(d.tag)+'"></div>' +
+          '<div class="field-group"><label>Timeframe</label><input type="text" data-phasefield="'+esc(p.id)+':range" value="'+esc(d.range)+'"></div>' +
+          '<div class="field-group"><label>Location</label><input type="text" data-phasefield="'+esc(p.id)+':location" value="'+esc(d.location)+'"></div>' +
+          '<div class="field-group"><label>Reports to</label><input type="text" data-phasefield="'+esc(p.id)+':reporting" value="'+esc(d.reporting)+'"></div>' +
+          '<div class="field-group"><label>Key output</label><input type="text" data-phasefield="'+esc(p.id)+':output" value="'+esc(d.output)+'"></div>' +
+          '<div class="field-group" style="grid-column:1/-1"><label>Description</label><textarea class="field-input" data-phasefield="'+esc(p.id)+':objective">'+esc(d.objective)+'</textarea></div>' +
+        '</div>' +
+        '<div class="action-row" style="margin-top:10px;">' +
+          '<button class="btn btn-primary btn-sm" data-savephase="'+esc(p.id)+'">Save changes</button>' +
+          '<button class="btn btn-danger-outline btn-sm" data-deletephase="'+esc(p.id)+'">Delete Key Objective</button>' +
+        '</div></div>';
+
+      out += '<div class="program-sub"><h3>Checklist Items</h3>';
+      if(items.length===0){ out += '<div class="hint">No items yet.</div>'; }
+      items.forEach(function(it){ out += renderProgramItem(it); });
+      var ni = state.newItemDraft[p.id] || {kind:'activity', text:''};
+      out += '<div class="inline-add-row">' +
+          '<select data-newitem-kind="'+esc(p.id)+'">' +
+            '<option value="activity"'+(ni.kind==='activity'?' selected':'')+'>Activity</option>' +
+            '<option value="criterion"'+(ni.kind==='criterion'?' selected':'')+'>Criterion</option>' +
+          '</select>' +
+          '<input type="text" data-newitem-text="'+esc(p.id)+'" placeholder="Describe the checklist item…" value="'+esc(ni.text)+'" style="flex:1; min-width:220px;">' +
+          '<button class="btn btn-primary btn-sm" data-additem="'+esc(p.id)+'">Add item</button>' +
+        '</div></div>';
+
+      out += renderProgramReviewers(p.id);
+
+      out += '</div>';
+    }
+    out += '</div>';
+    return out;
+  }
+
+  function renderProgramItem(it){
+    var draftKey = 'item:'+it.ItemId;
+    if(state.phaseDrafts[draftKey] === undefined) state.phaseDrafts[draftKey] = it.Text;
+    var val = state.phaseDrafts[draftKey];
+    return '<div class="program-item-row">' +
+        '<span class="kindtag">'+esc(it.Kind)+'</span>' +
+        '<textarea class="field-input" data-itemtext="'+esc(it.ItemId)+'">'+esc(val)+'</textarea>' +
+        '<div style="display:flex; flex-direction:column; gap:6px;">' +
+          '<button class="btn btn-ghost btn-sm" data-saveitem="'+esc(it.ItemId)+'">Save</button>' +
+          '<button class="btn btn-danger-outline btn-sm" data-deleteitem="'+esc(it.ItemId)+'">Delete</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function renderProgramReviewers(phaseId){
+    var assignments = state.program.reviewerAssignments.filter(function(a){ return String(a.PhaseId)===String(phaseId); });
+    var accountsById = {}; state.program.accounts.forEach(function(a){ accountsById[a.accountId] = a; });
+    var traineesById = {}; state.program.trainees.forEach(function(t){ traineesById[t.TraineeId] = t.Name; });
+    var eligibleAccounts = state.program.accounts.filter(function(a){ return a.role==='Admin' || SUPERVISOR_ROLES.indexOf(a.role)!==-1; });
+
+    var out = '<div class="program-sub"><h3>Who Reviews This</h3>' +
+      '<p class="hint">Set a program-wide default reviewer, or override it for one specific employee. With nothing set here, anyone with a supervisor-level role can review.</p>' +
+      '<div>';
+    if(assignments.length===0){ out += '<span class="hint">No reviewers assigned yet.</span>'; }
+    assignments.forEach(function(a){
+      var acc = accountsById[a.ReviewerAccountId];
+      var accName = esc(acc?acc.name:a.ReviewerAccountId);
+      var label = a.TraineeId ? (esc(traineesById[a.TraineeId]||a.TraineeId)+' &rarr; '+accName) : ('All employees &rarr; '+accName);
+      out += '<span class="reviewer-chip">'+label+'<button data-removereviewer="'+esc(a.AssignmentId)+'" title="Remove">&times;</button></span>';
+    });
+    out += '</div>';
+
+    var nd = state.newReviewerDraft[phaseId] || {traineeId:'', accountId:''};
+    out += '<div class="inline-add-row">' +
+        '<select data-newreviewer-trainee="'+esc(phaseId)+'">' +
+          '<option value="">All employees (default)</option>' +
+          state.program.trainees.map(function(t){ return '<option value="'+esc(t.TraineeId)+'"'+(nd.traineeId===t.TraineeId?' selected':'')+'>'+esc(t.Name)+' only</option>'; }).join('') +
+        '</select>' +
+        '<select data-newreviewer-account="'+esc(phaseId)+'">' +
+          '<option value="">Reviewer…</option>' +
+          eligibleAccounts.map(function(a){ return '<option value="'+esc(a.accountId)+'"'+(nd.accountId===a.accountId?' selected':'')+'>'+esc(a.name)+' ('+esc(a.role)+')</option>'; }).join('') +
+        '</select>' +
+        '<button class="btn btn-ghost btn-sm" data-addreviewer="'+esc(phaseId)+'">Add reviewer</button>' +
+      '</div></div>';
     return out;
   }
 
@@ -925,7 +1151,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function(btn){
       btn.addEventListener('click', function(){
         var tab = btn.getAttribute('data-tab');
-        if(tab==='admin') openAdmin(); else backToRoster();
+        if(tab==='admin') openAdmin(); else if(tab==='program') openProgram(); else backToRoster();
       });
     });
 
@@ -962,6 +1188,7 @@
     bindClick('[data-withdraw]', 'data-withdraw', function(def){ withdraw(def); });
     bindClick('[data-approve]', 'data-approve', function(def){ approve(def); });
     bindClick('[data-reject]', 'data-reject', function(def){ requestChanges(def); });
+    bindClick('[data-markcomplete]', 'data-markcomplete', function(def){ markComplete(def); });
 
     Array.prototype.forEach.call(document.querySelectorAll('[data-reset-account]'), function(btn){
       btn.addEventListener('click', function(){ showResetPasswordModal(btn.getAttribute('data-reset-account')); });
@@ -995,6 +1222,155 @@
         });
       });
     }
+
+    wireProgramEvents();
+  }
+
+  /* ---------------- manage program: event wiring ---------------- */
+  function wireProgramEvents(){
+    Array.prototype.forEach.call(document.querySelectorAll('[data-toggleprogram]'), function(row){
+      row.addEventListener('click', function(){
+        var id = row.getAttribute('data-toggleprogram');
+        state.expandedProgram[id] = !state.expandedProgram[id];
+        render();
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-phasefield]'), function(el){
+      el.addEventListener('input', function(){
+        var parts = el.getAttribute('data-phasefield').split(':');
+        if(!state.phaseDrafts[parts[0]]) state.phaseDrafts[parts[0]] = {};
+        state.phaseDrafts[parts[0]][parts[1]] = el.value;
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-savephase]'), function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-savephase');
+        var d = state.phaseDrafts[id] || {};
+        apiPost('updatePhase', {phaseId:id, title:d.title, tag:d.tag, range:d.range, location:d.location, reporting:d.reporting, output:d.output, objective:d.objective}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
+          state.programError = ''; loadProgram(); loadState();
+        });
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-deletephase]'), function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-deletephase');
+        if(!confirm('Delete this Key Objective and all of its checklist items for every employee? This cannot be undone.')) return;
+        apiPost('deletePhase', {phaseId:id}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not delete'; render(); return; }
+          delete state.phaseDrafts[id]; delete state.expandedProgram[id];
+          state.programError = ''; loadProgram(); loadState();
+        });
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-itemtext]'), function(ta){
+      ta.addEventListener('input', function(){ state.phaseDrafts['item:'+ta.getAttribute('data-itemtext')] = ta.value; });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-saveitem]'), function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-saveitem');
+        var text = state.phaseDrafts['item:'+id];
+        apiPost('updateItemDef', {itemId:id, text:text}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
+          state.programError = ''; loadProgram(); loadState();
+        });
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-deleteitem]'), function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-deleteitem');
+        if(!confirm('Delete this checklist item for every employee? This cannot be undone.')) return;
+        apiPost('deleteItemDef', {itemId:id}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not delete'; render(); return; }
+          state.programError = ''; loadProgram(); loadState();
+        });
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-newitem-kind]'), function(el){
+      el.addEventListener('change', function(){
+        var id = el.getAttribute('data-newitem-kind');
+        if(!state.newItemDraft[id]) state.newItemDraft[id] = {kind:'activity', text:''};
+        state.newItemDraft[id].kind = el.value;
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-newitem-text]'), function(el){
+      el.addEventListener('input', function(){
+        var id = el.getAttribute('data-newitem-text');
+        if(!state.newItemDraft[id]) state.newItemDraft[id] = {kind:'activity', text:''};
+        state.newItemDraft[id].text = el.value;
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-additem]'), function(btn){
+      btn.addEventListener('click', function(){
+        var phaseId = btn.getAttribute('data-additem');
+        var d = state.newItemDraft[phaseId] || {kind:'activity', text:''};
+        var text = (d.text||'').trim();
+        if(!text) return;
+        apiPost('createItemDef', {phase:phaseId, kind:d.kind, text:text}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not add item'; render(); return; }
+          state.programError = ''; state.newItemDraft[phaseId] = {kind:'activity', text:''};
+          loadProgram(); loadState();
+        });
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-newreviewer-trainee]'), function(el){
+      el.addEventListener('change', function(){
+        var id = el.getAttribute('data-newreviewer-trainee');
+        if(!state.newReviewerDraft[id]) state.newReviewerDraft[id] = {traineeId:'', accountId:''};
+        state.newReviewerDraft[id].traineeId = el.value;
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-newreviewer-account]'), function(el){
+      el.addEventListener('change', function(){
+        var id = el.getAttribute('data-newreviewer-account');
+        if(!state.newReviewerDraft[id]) state.newReviewerDraft[id] = {traineeId:'', accountId:''};
+        state.newReviewerDraft[id].accountId = el.value;
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-addreviewer]'), function(btn){
+      btn.addEventListener('click', function(){
+        var phaseId = btn.getAttribute('data-addreviewer');
+        var d = state.newReviewerDraft[phaseId] || {};
+        if(!d.accountId) return;
+        apiPost('setReviewerAssignment', {phaseId:phaseId, traineeId:d.traineeId||'', reviewerAccountId:d.accountId}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not add reviewer'; render(); return; }
+          state.programError = ''; state.newReviewerDraft[phaseId] = {traineeId:'', accountId:''};
+          loadProgram();
+        });
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-removereviewer]'), function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-removereviewer');
+        apiPost('removeReviewerAssignment', {assignmentId:id}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not remove'; render(); return; }
+          state.programError = ''; loadProgram();
+        });
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-newphase]'), function(el){
+      el.addEventListener('input', function(){ state.newPhaseDraft[el.getAttribute('data-newphase')] = el.value; });
+    });
+    var createPhaseBtn = document.getElementById('createPhaseBtn');
+    if(createPhaseBtn){
+      createPhaseBtn.addEventListener('click', function(){
+        var d = state.newPhaseDraft;
+        if(!d.title || !d.title.trim()) return;
+        apiPost('createPhase', {title:d.title.trim(), tag:d.tag, range:d.range, location:d.location, reporting:d.reporting, output:d.output, objective:d.objective}).then(function(res){
+          if(!res.ok){ state.programError = res.error || 'Could not create'; render(); return; }
+          state.programError = '';
+          state.newPhaseDraft = {title:'', tag:'', range:'', location:'', reporting:'', output:'', objective:''};
+          loadProgram(); loadState();
+        });
+      });
+    }
   }
 
   function bindClick(sel, attr, fn){
@@ -1019,10 +1395,10 @@
   if(state.token) { state.view = 'roster'; loadState(); }
   render();
   setInterval(function(){
-    // Skip while on Manage Accounts — that tab has no live roster data to
-    // refresh, and re-rendering it mid-poll would wipe whatever the admin
-    // is currently typing into the create-account form.
-    if(state.view==='admin') return;
+    // Skip while on Manage Accounts / Manage Program — those tabs have no
+    // live roster data to refresh, and re-rendering mid-poll would wipe
+    // whatever the admin is currently typing into a form.
+    if(state.view==='admin' || state.view==='program') return;
     if(state.token || !apiConfigured()) loadState();
   }, POLL_MS);
 })();
