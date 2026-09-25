@@ -305,11 +305,33 @@ function makeTempPassword_() {
 
 /* ---------------- generic sheet helpers ---------------- */
 
+// Request-scoped read cache, used only during doGet. Several read paths
+// there (visibleTraineesFor_, rosterList_) call sheetToObjects_ on the same
+// sheet many times in a loop — once per employee, sometimes once per
+// employee per objective — and each call is a real round-trip to the Sheets
+// API, so an uncached roster load can issue dozens of redundant full-sheet
+// reads (this was the actual cause of slow page loads). doGet never writes,
+// so caching every read for its duration is entirely safe: nothing changes
+// underneath it mid-request. doPost interleaves reads and writes throughout
+// its handlers, so it deliberately leaves caching OFF and keeps the
+// original always-hit-the-API behavior — correctness there matters more
+// than doPost's comparatively cheap, single-item reads being fast.
+var _sheetCache = null; // null = caching off (doPost / not in a request)
+function _resetSheetCache_(enabled) { _sheetCache = enabled ? {} : null; }
+
 function sheetToObjects_(sheet, headers) {
+  if (!_sheetCache) return _readSheetRows_(sheet, headers);
+  var key = sheet.getName();
+  if (!Object.prototype.hasOwnProperty.call(_sheetCache, key)) {
+    _sheetCache[key] = _readSheetRows_(sheet, headers);
+  }
+  return _sheetCache[key];
+}
+
+function _readSheetRows_(sheet, headers) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  var values = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
-  return values
+  return sheet.getRange(2, 1, lastRow - 1, headers.length).getValues()
     .filter(function (r) { return r[0] !== ''; })
     .map(function (r) {
       var o = {};
@@ -622,6 +644,7 @@ function appendHistory_(traineeId, itemId, phase, action, actorName, actorRole, 
 /* ---------------- HTTP entry points ---------------- */
 
 function doGet(e) {
+  _resetSheetCache_(true); // safe: doGet is read-only for its whole duration
   try {
     var acc = resolveSession_(e.parameter.token);
     if (!acc) return json_({ ok: false, error: 'auth', code: 'session_invalid' });
@@ -664,6 +687,11 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  // Explicitly OFF (not just "not turned on") — Apps Script can reuse this
+  // JS execution context across separate web app invocations, so without
+  // this a doPost could otherwise inherit a stale cache object left behind
+  // by an earlier doGet call in the same warm instance.
+  _resetSheetCache_(false);
   var body;
   try {
     body = JSON.parse(e.postData.contents);
