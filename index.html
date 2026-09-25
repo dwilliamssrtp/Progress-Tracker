@@ -560,6 +560,12 @@
     state.activeTraineeId = traineeId;
     state.view = 'trainee';
     state.expanded = {};
+    // Clear the previously-viewed employee's data so the immediate render
+    // below (before loadState()'s fetch resolves) shows an honest loading
+    // state instead of their content briefly appearing under this
+    // employee's name/header — that flash used to read as "wrong data",
+    // not "still loading".
+    state.trainee = null;
     render();
     loadState();
   }
@@ -736,7 +742,8 @@
   function renderHeader(){
     var acc = state.account || {name:'', role:''};
     var initialsTxt = acc.name ? esc(initials(acc.name)) : '?';
-    var overall = (state.view==='trainee' && state.activeTraineeId) ? overallCounts() : null;
+    var traineeDataReady = state.trainee && state.trainee.traineeId===state.activeTraineeId;
+    var overall = (state.view==='trainee' && state.activeTraineeId && traineeDataReady) ? overallCounts() : null;
     var pct = overall && overall.total ? (overall.approved/overall.total*100) : 0;
 
     return '' +
@@ -799,6 +806,15 @@
 
   /* ---------------- trainee detail (own or drilled-into) ---------------- */
   function renderTraineeView(){
+    // state.phases/items can still be holding the previously-viewed
+    // employee's data for a moment after navigating (the fetch for this
+    // one hasn't resolved yet) — render a loading state instead of their
+    // rail/objective content until state.trainee actually matches who's
+    // being viewed, rather than showing content that belongs to someone
+    // else under this employee's name.
+    if(!state.trainee || state.trainee.traineeId !== state.activeTraineeId){
+      return '<div class="hint" style="padding:60px 0; text-align:center;">Loading…</div>';
+    }
     var out = '<div class="layout">';
     out += renderRail();
     out += renderMain();
