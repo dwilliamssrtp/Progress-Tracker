@@ -25,13 +25,20 @@
  * Program tab) instead of being hardcoded here; this file only seeds
  * sensible starting content the first time it runs, via setup().
  *
- * REVIEW HIERARCHY — `ReviewerAssignments` lets an admin say who is allowed
- * to review (approve / request changes / mark complete) each Key Objective.
- * An assignment can be a program-wide default for that objective (TraineeId
- * blank) or an override for one specific employee. If nothing is configured
- * for an objective, review authority falls back to the legacy behavior:
- * anyone whose account role is in SUPERVISOR_ROLES. Admins can always
- * review anything.
+ * REVIEW HIERARCHY / PERMISSIONS — `Role` (Engineer / Sales / Manufacturing /
+ * Admin) is just a department label now; it grants no review rights by
+ * itself (Admin excepted — an Admin can always review, edit, and see
+ * everything). Who can review whom is entirely explicit, via
+ * `ReviewerAssignments`: an assignment is either a program-wide default for
+ * a Key Objective (TraineeId blank — set from that objective's "Reports to"
+ * picker) or an override for one specific employee on that objective. A
+ * "VP of Engineering" is Role=Engineer like anyone else on that track; what
+ * makes them a manager is being named in `ReviewerAssignments` for the
+ * objectives their reports are on. The Team Roster a non-Admin account sees
+ * is scoped the same way: only employees they're an assigned reviewer for
+ * (see `visibleTraineesFor_`). Until an admin sets up an objective's
+ * "Reports to", nobody but Admin can review it — nothing falls back to a
+ * role-based default any more.
  *
  * AUTH MODEL — lightweight, not enterprise-grade: accounts live in the
  * `Accounts` sheet with a salted SHA-256 password hash (Utilities.computeDigest,
@@ -73,8 +80,22 @@ var ITEMDEF_HEADERS = ['ItemId', 'Phase', 'Kind', 'Text', 'Order'];
 var REVIEWER_HEADERS = ['AssignmentId', 'PhaseId', 'TraineeId', 'ReviewerAccountId', 'CreatedAt', 'CreatedBy'];
 var TRACK_HEADERS = ['TrackId', 'Name', 'Description', 'CreatedAt', 'CreatedBy'];
 
-var ROLES = ['Trainee', 'Manufacturing Manager', 'VP Production & Engineering', 'CTO', 'Admin', 'Viewer'];
-var SUPERVISOR_ROLES = ['Manufacturing Manager', 'VP Production & Engineering', 'CTO', 'Admin'];
+// Just a department label — it grants no permissions by itself. Who can
+// review/manage whom is entirely explicit via ReviewerAssignments (see the
+// PROGRAM MODEL / REVIEW HIERARCHY comment above). Admin is the one
+// exception: it's both the department-less "runs the whole site" role and
+// an implicit superuser for review/visibility everywhere.
+var ROLES = ['Engineer', 'Sales', 'Manufacturing', 'Admin'];
+// Old role values, from before roles were simplified to the list above —
+// used once by setup() to migrate any existing Accounts rows. Add to this
+// if you rename roles again later.
+var LEGACY_ROLE_MAP = {
+  'Trainee': 'Engineer',
+  'Manufacturing Manager': 'Manufacturing',
+  'VP Production & Engineering': 'Engineer',
+  'CTO': 'Engineer',
+  'Viewer': 'Engineer'
+};
 var SESSION_DAYS = 30;
 
 // Fill in to email people automatically (employee submits -> supervisors;
@@ -215,6 +236,37 @@ function setup() {
     if (!t.TrackId) { trainees.getRange(idx + 2, TRAINEE_HEADERS.indexOf('TrackId') + 1).setValue(defaultTrackId); migratedTrainees++; }
   });
   if (migratedTrainees) msg += '\n\nAssigned ' + migratedTrainees + ' existing employee(s) to the default track.';
+
+  // Migration: collapse old role values onto the new Engineer/Sales/
+  // Manufacturing/Admin set. Role no longer grants review permissions by
+  // itself — only ReviewerAssignments does (see the REVIEW HIERARCHY /
+  // PERMISSIONS comment at the top of this file).
+  var accountObjs = sheetToObjects_(accounts, ACCOUNT_HEADERS);
+  var migratedRoles = 0;
+  accountObjs.forEach(function (a, idx) {
+    if (ROLES.indexOf(a.Role) === -1) {
+      var newRole = LEGACY_ROLE_MAP[a.Role] || 'Engineer';
+      accounts.getRange(idx + 2, ACCOUNT_HEADERS.indexOf('Role') + 1).setValue(newRole);
+      migratedRoles++;
+    }
+  });
+  if (migratedRoles) msg += '\n\nMapped ' + migratedRoles + ' existing account(s) onto the new Engineer/Sales/Manufacturing/Admin roles. IMPORTANT: role alone no longer grants review permission — anyone who used to review people by virtue of their old role (Manager/VP/CTO) needs to be explicitly set as a Key Objective\'s "Reports to" (or a per-employee override) in Manage Program, or they will not be able to review anyone until you do.';
+
+  // Migration: give every non-Admin account without one a personal
+  // career-development record, same as if they'd been created fresh — a
+  // department role no longer determines whether someone gets a Track.
+  accountObjs = sheetToObjects_(accounts, ACCOUNT_HEADERS); // re-read: roles above may have changed
+  var migratedAccounts = 0;
+  accountObjs.forEach(function (a, idx) {
+    if (a.Role !== 'Admin' && !a.TraineeId) {
+      var newTraineeId = newId_('t');
+      trainees.appendRow([newTraineeId, a.Name, '', 'active', new Date(), 'setup() migration', defaultTrackId]);
+      seedItemsForTrainee_(newTraineeId, defaultTrackId);
+      accounts.getRange(idx + 2, ACCOUNT_HEADERS.indexOf('TraineeId') + 1).setValue(newTraineeId);
+      migratedAccounts++;
+    }
+  });
+  if (migratedAccounts) msg += '\n\nGave ' + migratedAccounts + ' existing account(s) a personal career-development record on the default track (they didn\'t have one before) — reassign them to the right Track from Manage Program\'s Employees & Tracks table if needed.';
 
   var existingAdmin = findAccountByUsername_('admin');
   if (!existingAdmin) {
@@ -363,10 +415,6 @@ function requireAuth_(body) {
   return acc;
 }
 
-function requireSupervisor_(acc) {
-  if (SUPERVISOR_ROLES.indexOf(acc.Role) === -1) { var e = new Error('Not authorized'); e.authError = true; throw e; }
-}
-
 function requireAdmin_(acc) {
   if (acc.Role !== 'Admin') { var e = new Error('Admin only'); e.authError = true; throw e; }
 }
@@ -424,10 +472,12 @@ function reviewerIdsForPhase_(phaseId, traineeId) {
   return chosen.map(function (r) { return r.ReviewerAccountId; });
 }
 
+// Review permission is fully explicit now — Admin aside, nothing falls
+// back to a role check. If a Key Objective has no "Reports to" set and no
+// per-employee override, nobody but Admin can review it yet.
 function canReview_(acc, phaseId, traineeId) {
   if (acc.Role === 'Admin') return true;
   var ids = reviewerIdsForPhase_(phaseId, traineeId);
-  if (ids.length === 0) return SUPERVISOR_ROLES.indexOf(acc.Role) !== -1;
   return ids.indexOf(acc.AccountId) !== -1;
 }
 
@@ -435,10 +485,32 @@ function requireReviewer_(acc, phaseId, traineeId) {
   if (!canReview_(acc, phaseId, traineeId)) { var e = new Error('You are not a reviewer for this Key Objective'); e.authError = true; throw e; }
 }
 
+// True if `acc` manages `traineeId` in some capacity — a reviewer on at
+// least one of their Key Objectives. Admin always qualifies. Used to gate
+// things like editing an employee's name/start date.
+function isManagerOf_(acc, traineeId) {
+  if (acc.Role === 'Admin') return true;
+  return phasesForTrainee_(traineeId).some(function (p) { return canReview_(acc, p.id, traineeId); });
+}
+
+function requireManagerOf_(acc, traineeId) {
+  if (!isManagerOf_(acc, traineeId)) { var e = new Error('Not authorized'); e.authError = true; throw e; }
+}
+
+// Every employee `acc` is allowed to see in the Team Roster: Admin sees
+// everyone; anyone else sees only the employees they manage (see
+// isManagerOf_). This is what makes "certain people report to him" a real
+// visibility boundary, not just a review-button gate.
+function visibleTraineesFor_(acc) {
+  var all = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS);
+  if (acc.Role === 'Admin') return all;
+  return all.filter(function (t) { return isManagerOf_(acc, t.TraineeId); });
+}
+
 // Resolved reviewers for every phase, for one employee — used by the front
 // end to show "Reviewed by" and to gate action buttons in the UI. Falls
-// back to listing everyone with a supervisor role when nothing is configured,
-// so the UI stays informative even before an admin sets up the hierarchy.
+// back to listing Admin accounts when nothing is configured yet, so the
+// "who reviews this" display is never silently empty.
 // `phases` should be that employee's own Track's objectives (phasesForTrainee_);
 // defaults to every objective across every Track if omitted.
 function reviewersByPhaseFor_(traineeId, phases) {
@@ -451,7 +523,7 @@ function reviewersByPhaseFor_(traineeId, phases) {
     var list;
     if (usingDefault) {
       list = sheetToObjects_(getAccountsSheet_(), ACCOUNT_HEADERS)
-        .filter(function (a) { return SUPERVISOR_ROLES.indexOf(a.Role) !== -1; });
+        .filter(function (a) { return a.Role === 'Admin'; });
     } else {
       list = ids.map(function (id) { return accountsById[id]; }).filter(Boolean);
     }
@@ -508,8 +580,8 @@ function traineeCounts_(traineeId) {
   return { total: items.length, approved: approved, submitted: submitted };
 }
 
-function rosterList_() {
-  var trainees = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS);
+function rosterList_(trainees) {
+  trainees = trainees || sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS);
   var trackNameById = {};
   sheetToObjects_(getTracksSheet_(), TRACK_HEADERS).forEach(function (t) { trackNameById[t.TrackId] = t.Name; });
   return trainees.map(function (t) {
@@ -538,7 +610,7 @@ function itemLookup_(itemId) {
 function traineeAccountEmails_(traineeId) {
   var accounts = sheetToObjects_(getAccountsSheet_(), ACCOUNT_HEADERS);
   return accounts
-    .filter(function (a) { return a.Role === 'Trainee' && String(a.TraineeId) === String(traineeId) && a.Email; })
+    .filter(function (a) { return String(a.TraineeId) === String(traineeId) && a.TraineeId && a.Email; })
     .map(function (a) { return a.Email; });
 }
 
@@ -571,8 +643,13 @@ function doGet(e) {
       var t2 = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS).filter(function (t) { return String(t.TraineeId) === String(requestedTraineeId); })[0];
       if (!t2) return json_({ ok: false, error: 'Unknown employee' });
       var theirPhases = phasesForTrainee_(requestedTraineeId);
+      // A non-Trainee-role account (Manager, VP, etc.) can also have a
+      // personal Track of their own now; when they drill into themselves
+      // from the roster, isOwn lets the front end treat it like the
+      // 'trainee' mode above (they can submit/withdraw their own items).
       return json_({
         ok: true, mode: 'detail', account: publicAccount_(acc),
+        isOwn: !!acc.TraineeId && String(requestedTraineeId) === String(acc.TraineeId),
         trainee: { traineeId: t2.TraineeId, name: t2.Name, startDate: t2.StartDate, trackId: t2.TrackId || '' },
         items: itemsForTrainee_(requestedTraineeId),
         phases: theirPhases,
@@ -580,7 +657,7 @@ function doGet(e) {
       });
     }
 
-    return json_({ ok: true, mode: 'roster', account: publicAccount_(acc), trainees: rosterList_(), phases: phasesList_() });
+    return json_({ ok: true, mode: 'roster', account: publicAccount_(acc), trainees: rosterList_(visibleTraineesFor_(acc)), phases: phasesList_() });
   } catch (err) {
     return json_({ ok: false, error: String(err) });
   }
@@ -612,6 +689,8 @@ function doPost(e) {
       case 'createAccount': return handleCreateAccount_(acc, body);
       case 'resetPassword': return handleResetPassword_(acc, body);
       case 'setAccountActive': return handleSetAccountActive_(acc, body);
+      case 'updateAccount': return handleUpdateAccount_(acc, body);
+      case 'deleteAccount': return handleDeleteAccount_(acc, body);
       case 'listProgram': return handleListProgram_(acc, body);
       case 'createPhase': return handleCreatePhase_(acc, body);
       case 'updatePhase': return handleUpdatePhase_(acc, body);
@@ -683,8 +762,11 @@ function handleCreateAccount_(acc, body) {
   if (!body.password || String(body.password).length < 6) return json_({ ok: false, error: 'Password must be at least 6 characters' });
   if (findAccountByUsername_(username)) return json_({ ok: false, error: 'That username is already taken' });
 
+  // Every non-Admin account gets their own career-development record —
+  // this isn't reserved for the "Trainee" role label any more. A Manager
+  // or VP has their own Track too, reviewed by whoever's above them.
   var traineeId = '';
-  if (role === 'Trainee') {
+  if (role !== 'Admin') {
     var trackId = String(body.trackId || '').trim();
     if (!trackId || findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', trackId) < 0) return json_({ ok: false, error: 'Choose a valid Track for this employee' });
     traineeId = newId_('t');
@@ -719,6 +801,66 @@ function handleSetAccountActive_(acc, body) {
   var row = findRowIndex_(sheet, ACCOUNT_HEADERS, 'AccountId', body.accountId);
   if (row < 0) return json_({ ok: false, error: 'Unknown account' });
   sheet.getRange(row, ACCOUNT_HEADERS.indexOf('Active') + 1).setValue(!!body.active);
+  return json_({ ok: true });
+}
+
+function handleUpdateAccount_(acc, body) {
+  requireAdmin_(acc);
+  var sheet = getAccountsSheet_();
+  var row = findRowIndex_(sheet, ACCOUNT_HEADERS, 'AccountId', body.accountId);
+  if (row < 0) return json_({ ok: false, error: 'Unknown account' });
+  var current = sheetToObjects_(sheet, ACCOUNT_HEADERS).filter(function (a) { return a.AccountId === body.accountId; })[0];
+
+  if (body.username !== undefined) {
+    var newUsername = String(body.username).trim();
+    if (!newUsername) return json_({ ok: false, error: 'Username is required' });
+    var existing = findAccountByUsername_(newUsername);
+    if (existing && existing.AccountId !== body.accountId) return json_({ ok: false, error: 'That username is already taken' });
+    sheet.getRange(row, ACCOUNT_HEADERS.indexOf('Username') + 1).setValue(newUsername);
+  }
+  if (body.name !== undefined) {
+    var newName = String(body.name).trim();
+    if (!newName) return json_({ ok: false, error: 'Name is required' });
+    sheet.getRange(row, ACCOUNT_HEADERS.indexOf('Name') + 1).setValue(newName);
+    // Keep the linked Trainee record's display name in sync — the roster
+    // reads Trainees.Name, not Accounts.Name.
+    if (current.TraineeId) {
+      var traineeRow = findRowIndex_(getTraineesSheet_(), TRAINEE_HEADERS, 'TraineeId', current.TraineeId);
+      if (traineeRow >= 0) getTraineesSheet_().getRange(traineeRow, TRAINEE_HEADERS.indexOf('Name') + 1).setValue(newName);
+    }
+  }
+  if (body.email !== undefined) {
+    sheet.getRange(row, ACCOUNT_HEADERS.indexOf('Email') + 1).setValue(body.email);
+  }
+
+  // Assigning a Track here works for any non-Admin account, including one
+  // created before Tracks existed (or before every role got a personal
+  // checklist) — it creates the Trainee record on the spot if missing.
+  if (body.trackId) {
+    if (findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', body.trackId) < 0) return json_({ ok: false, error: 'Unknown track' });
+    if (current.TraineeId) {
+      assignTraineeTrack_(current.TraineeId, body.trackId);
+    } else {
+      var traineeId = newId_('t');
+      var traineeName = body.name !== undefined ? String(body.name).trim() : current.Name;
+      getTraineesSheet_().appendRow([traineeId, traineeName, '', 'active', new Date(), acc.Name, body.trackId]);
+      seedItemsForTrainee_(traineeId, body.trackId);
+      sheet.getRange(row, ACCOUNT_HEADERS.indexOf('TraineeId') + 1).setValue(traineeId);
+    }
+  }
+
+  return json_({ ok: true });
+}
+
+function handleDeleteAccount_(acc, body) {
+  requireAdmin_(acc);
+  if (String(body.accountId) === String(acc.AccountId)) return json_({ ok: false, error: 'You cannot delete your own account' });
+  var row = findRowIndex_(getAccountsSheet_(), ACCOUNT_HEADERS, 'AccountId', body.accountId);
+  if (row < 0) return json_({ ok: false, error: 'Unknown account' });
+  // Deletes the login only — their Trainee/Items history (if any) stays on
+  // the roster; an admin can hand it to a new account later if needed.
+  getAccountsSheet_().deleteRow(row);
+  deleteRowsWhere_(getSessionsSheet_(), SESSION_HEADERS, function (s) { return String(s.AccountId) === String(body.accountId); });
   return json_({ ok: true });
 }
 
@@ -775,28 +917,52 @@ function handleDeleteTrack_(acc, body) {
 // is left alone (it just stops being shown, since the front end only
 // renders the objectives on the employee's current Track); any objectives
 // on the new Track they don't already have an item row for are seeded in
-// as 'open', same as a brand-new employee on that Track.
-function handleSetTraineeTrack_(acc, body) {
-  requireAdmin_(acc);
+// as 'open', same as a brand-new employee on that Track. Shared by
+// handleSetTraineeTrack_ and handleUpdateAccount_ (assigning a Track to an
+// account that didn't have one before creates the Trainee row first).
+function assignTraineeTrack_(traineeId, trackId) {
   var sheet = getTraineesSheet_();
-  var row = findRowIndex_(sheet, TRAINEE_HEADERS, 'TraineeId', body.traineeId);
-  if (row < 0) return json_({ ok: false, error: 'Unknown employee' });
-  if (findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', body.trackId) < 0) return json_({ ok: false, error: 'Unknown track' });
-
-  sheet.getRange(row, TRAINEE_HEADERS.indexOf('TrackId') + 1).setValue(body.trackId);
+  var row = findRowIndex_(sheet, TRAINEE_HEADERS, 'TraineeId', traineeId);
+  if (row < 0) return;
+  sheet.getRange(row, TRAINEE_HEADERS.indexOf('TrackId') + 1).setValue(trackId);
 
   var existingItemIds = {};
-  itemsForTrainee_(body.traineeId).forEach(function (it) { existingItemIds[it.ItemId] = true; });
-  var phaseIds = phasesList_(body.trackId).map(function (p) { return p.id; });
+  itemsForTrainee_(traineeId).forEach(function (it) { existingItemIds[it.ItemId] = true; });
+  var phaseIds = phasesList_(trackId).map(function (p) { return p.id; });
   var defs = itemDefsList_().filter(function (d) { return phaseIds.indexOf(d.Phase) !== -1 && !existingItemIds[d.ItemId]; });
   var rows = defs.map(function (d) {
-    return [body.traineeId, d.ItemId, d.Phase, d.Kind, d.Order, d.Text, 'open', '', '', '', '', '', '', '', ''];
+    return [traineeId, d.ItemId, d.Phase, d.Kind, d.Order, d.Text, 'open', '', '', '', '', '', '', '', ''];
   });
   if (rows.length) {
     var itemsSheet = getItemsSheet_();
     itemsSheet.getRange(itemsSheet.getLastRow() + 1, 1, rows.length, ITEM_HEADERS.length).setValues(rows);
   }
+}
+
+function handleSetTraineeTrack_(acc, body) {
+  requireAdmin_(acc);
+  if (findRowIndex_(getTraineesSheet_(), TRAINEE_HEADERS, 'TraineeId', body.traineeId) < 0) return json_({ ok: false, error: 'Unknown employee' });
+  if (findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', body.trackId) < 0) return json_({ ok: false, error: 'Unknown track' });
+  assignTraineeTrack_(body.traineeId, body.trackId);
   return json_({ ok: true });
+}
+
+// The "Reports to" shown on a Key Objective is now a real multi-account
+// picker, not free text — this is the display string derived from it.
+function reportingLabelFor_(reviewerAccountIds) {
+  var accountsById = {};
+  sheetToObjects_(getAccountsSheet_(), ACCOUNT_HEADERS).forEach(function (a) { accountsById[a.AccountId] = a; });
+  return (reviewerAccountIds || []).map(function (id) { var a = accountsById[id]; return a ? a.Name : id; }).join(', ');
+}
+
+// Replaces a Key Objective's program-wide default reviewers (the ones with
+// no TraineeId) with exactly this set of accounts. Per-employee overrides
+// are untouched.
+function replacePhaseDefaultReviewers_(phaseId, reviewerAccountIds, actorName) {
+  deleteRowsWhere_(getReviewersSheet_(), REVIEWER_HEADERS, function (r) { return String(r.PhaseId) === String(phaseId) && !r.TraineeId; });
+  (reviewerAccountIds || []).forEach(function (id) {
+    getReviewersSheet_().appendRow([newId_('rev'), phaseId, '', id, new Date(), actorName]);
+  });
 }
 
 function handleCreatePhase_(acc, body) {
@@ -809,10 +975,12 @@ function handleCreatePhase_(acc, body) {
   if (findRowIndex_(getPhasesSheet_(), PHASE_HEADERS, 'PhaseId', id) >= 0) return json_({ ok: false, error: 'That Key Objective ID is already used' });
   var existing = phasesList_(trackId);
   var order = body.order !== undefined ? body.order : (existing.length ? Math.max.apply(null, existing.map(function (p) { return Number(p.order) || 0; })) + 1 : 1);
+  var reviewerAccountIds = Array.isArray(body.reviewerAccountIds) ? body.reviewerAccountIds : [];
   getPhasesSheet_().appendRow([
     id, body.tag || title.slice(0, 3).toUpperCase(), title, body.range || '', body.location || '',
-    body.reporting || '', body.output || '', body.objective || '', order, trackId
+    reportingLabelFor_(reviewerAccountIds), body.output || '', body.objective || '', order, trackId
   ]);
+  replacePhaseDefaultReviewers_(id, reviewerAccountIds, acc.Name);
   return json_({ ok: true, phaseId: id });
 }
 
@@ -825,7 +993,11 @@ function handleUpdatePhase_(acc, body) {
     if (findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', body.trackId) < 0) return json_({ ok: false, error: 'Unknown track' });
     sheet.getRange(row, PHASE_HEADERS.indexOf('TrackId') + 1).setValue(body.trackId);
   }
-  var fieldMap = { tag: 'Tag', title: 'Title', range: 'RangeLabel', location: 'Location', reporting: 'ReportingLabel', output: 'Output', objective: 'ObjectiveText', order: 'Order' };
+  if (Array.isArray(body.reviewerAccountIds)) {
+    replacePhaseDefaultReviewers_(body.phaseId, body.reviewerAccountIds, acc.Name);
+    sheet.getRange(row, PHASE_HEADERS.indexOf('ReportingLabel') + 1).setValue(reportingLabelFor_(body.reviewerAccountIds));
+  }
+  var fieldMap = { tag: 'Tag', title: 'Title', range: 'RangeLabel', location: 'Location', output: 'Output', objective: 'ObjectiveText', order: 'Order' };
   Object.keys(fieldMap).forEach(function (k) {
     if (body[k] !== undefined) sheet.getRange(row, PHASE_HEADERS.indexOf(fieldMap[k]) + 1).setValue(body[k]);
   });
@@ -946,7 +1118,7 @@ function handleRemoveReviewerAssignment_(acc, body) {
 /* ---------------- employee/reviewer actions ---------------- */
 
 function handleMarkDone_(acc, body) {
-  if (acc.Role !== 'Trainee' || String(acc.TraineeId) !== String(body.traineeId)) return json_({ ok: false, error: 'auth', code: 'forbidden' });
+  if (!acc.TraineeId || String(acc.TraineeId) !== String(body.traineeId)) return json_({ ok: false, error: 'auth', code: 'forbidden' });
   var sheet = getItemsSheet_();
   var row = findItemRow_(sheet, body.traineeId, body.itemId);
   if (row < 0) return json_({ ok: false, error: 'Unknown item: ' + body.itemId });
@@ -990,7 +1162,7 @@ function handleMarkComplete_(acc, body) {
 }
 
 function handleWithdraw_(acc, body) {
-  if (acc.Role !== 'Trainee' || String(acc.TraineeId) !== String(body.traineeId)) return json_({ ok: false, error: 'auth', code: 'forbidden' });
+  if (!acc.TraineeId || String(acc.TraineeId) !== String(body.traineeId)) return json_({ ok: false, error: 'auth', code: 'forbidden' });
   var sheet = getItemsSheet_();
   var row = findItemRow_(sheet, body.traineeId, body.itemId);
   if (row < 0) return json_({ ok: false, error: 'Unknown item: ' + body.itemId });
@@ -1042,7 +1214,7 @@ function handleRequestChanges_(acc, body) {
 }
 
 function handleUpdateTraineeMeta_(acc, body) {
-  requireSupervisor_(acc);
+  requireManagerOf_(acc, body.traineeId);
   var sheet = getTraineesSheet_();
   var row = findRowIndex_(sheet, TRAINEE_HEADERS, 'TraineeId', body.traineeId);
   if (row < 0) return json_({ ok: false, error: 'Unknown employee' });

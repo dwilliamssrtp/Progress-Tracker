@@ -267,14 +267,16 @@
       objective:'Take ownership of core responsibilities with decreasing supervision, and begin contributing beyond the immediate role.' }
   ];
 
-  var ROLES = ['Trainee','Manufacturing Manager','VP Production & Engineering','CTO','Admin','Viewer'];
-  var SUPERVISOR_ROLES = ['Manufacturing Manager','VP Production & Engineering','CTO','Admin'];
+  // Just a department label — it grants no permissions by itself. Who can
+  // review/manage whom is entirely explicit (see the backend's "Reports to"
+  // picker and per-employee overrides), Admin aside, which is a superuser.
+  var ROLES = ['Engineer','Sales','Manufacturing','Admin'];
 
   // Sample rows shown before the sheet API is configured / while offline,
   // so the page never opens to an empty shell.
   var SAMPLE_ITEMS = [
-    {ItemId:'ob-a1', Phase:'onboard', Kind:'activity', Text:'Complete orientation and meet your core team', Status:'approved', Note:'Done in week one.', SubmittedByName:'Sample Employee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-02T14:00:00Z', ReviewedByName:'Sample Manager', ReviewedByRole:'Manufacturing Manager', ReviewedAt:'2026-06-03T09:00:00Z', ReviewNote:''},
-    {ItemId:'ob-a2', Phase:'onboard', Kind:'activity', Text:'Shadow each core workflow the role touches', Status:'submitted', Note:'Finished shadowing, ready for review.', SubmittedByName:'Sample Employee', SubmittedByRole:'Trainee', SubmittedAt:'2026-06-10T16:00:00Z', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''},
+    {ItemId:'ob-a1', Phase:'onboard', Kind:'activity', Text:'Complete orientation and meet your core team', Status:'approved', Note:'Done in week one.', SubmittedByName:'Sample Employee', SubmittedByRole:'Engineer', SubmittedAt:'2026-06-02T14:00:00Z', ReviewedByName:'Sample Manager', ReviewedByRole:'Engineer', ReviewedAt:'2026-06-03T09:00:00Z', ReviewNote:''},
+    {ItemId:'ob-a2', Phase:'onboard', Kind:'activity', Text:'Shadow each core workflow the role touches', Status:'submitted', Note:'Finished shadowing, ready for review.', SubmittedByName:'Sample Employee', SubmittedByRole:'Engineer', SubmittedAt:'2026-06-10T16:00:00Z', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''},
     {ItemId:'ob-c1', Phase:'onboard', Kind:'criterion', Text:'Can complete core tasks without constant supervision', Status:'open', Note:'', SubmittedByName:'', SubmittedByRole:'', SubmittedAt:'', ReviewedByName:'', ReviewedByRole:'', ReviewedAt:'', ReviewNote:''}
   ];
   var SAMPLE_ROSTER = [
@@ -300,7 +302,7 @@
     expandedProgram: {},
     phaseDrafts: {},
     newItemDraft: {},
-    newPhaseDraft: {title:'', tag:'', range:'', location:'', reporting:'', output:'', objective:''},
+    newPhaseDraft: {title:'', tag:'', range:'', location:'', reviewerAccountIds:[], output:'', objective:''},
     newReviewerDraft: {},
     newTrackDraft: {name:'', description:''},
     trackDrafts: {},        // trackId -> {name, description} edit drafts
@@ -313,27 +315,32 @@
     offline: false,
     loginError: '',
     adminError: '',
-    newAcctDraft: {name:'', username:'', role:'Trainee', startDate:'', trackId:'', email:'', password:''}
+    newAcctDraft: {name:'', username:'', role:'Engineer', startDate:'', trackId:'', email:'', password:''}
   };
   var focusRestore = null;
   var itemDefsCache = {};
 
   function apiConfigured(){ return API_URL && API_URL.indexOf('PASTE_') !== 0; }
-  function isTraineeAcct(){ return state.account && state.account.role === 'Trainee'; }
-  function isSupervisorAcct(){ return state.account && SUPERVISOR_ROLES.indexOf(state.account.role) !== -1; }
   function isAdminAcct(){ return state.account && state.account.role === 'Admin'; }
   // Whether the signed-in account may review items in a given Key
   // Objective for the employee currently being viewed. Mirrors the
-  // backend's canReview_: an admin-assigned hierarchy (state.reviewersByPhase)
-  // wins when set for this phase; otherwise any supervisor-role account can
-  // review, matching the server's fallback. The server re-checks this on
-  // every write, so this is only for showing/hiding buttons.
+  // backend's canReview_ exactly: fully explicit via state.reviewersByPhase
+  // (the objective's "Reports to" picks plus any per-employee override),
+  // Admin aside. No role-based fallback any more — the server re-checks
+  // this on every write, so this is only for showing/hiding buttons.
   function isReviewerForPhase(phaseId){
     if(isAdminAcct()) return true;
     if(state.reviewersByPhase && state.reviewersByPhase[phaseId]){
       return state.reviewersByPhase[phaseId].some(function(r){ return state.account && r.accountId===state.account.accountId; });
     }
-    return isSupervisorAcct();
+    return false;
+  }
+  // Whether the signed-in account manages the employee currently loaded —
+  // a reviewer on at least one of their Key Objectives, or Admin.
+  function canManageActiveTrainee(){
+    if(isAdminAcct()) return true;
+    if(!state.reviewersByPhase) return false;
+    return Object.keys(state.reviewersByPhase).some(function(pid){ return isReviewerForPhase(pid); });
   }
 
   function itemsForPhase(phaseId){
@@ -436,7 +443,7 @@
         if(!res.ok){ state.loginError = res.error || 'Login failed'; render(); return; }
         state.token = res.token; state.account = res.account; state.loginError = '';
         persistAuth();
-        state.view = isTraineeAcct() ? 'trainee' : 'roster';
+        state.view = 'roster';
         loadState();
       })
       .catch(function(err){ state.loginError = 'Could not reach the server.'; render(); });
@@ -479,8 +486,7 @@
     if(!state.token){ render(); return; }
 
     var params = {};
-    if(isTraineeAcct()){ /* server infers from account, no traineeId needed */ }
-    else if(state.view==='trainee' && state.activeTraineeId){ params.traineeId = state.activeTraineeId; }
+    if(state.view==='trainee' && state.activeTraineeId){ params.traineeId = state.activeTraineeId; }
 
     apiGet(params).then(function(res){
       if(!res.ok){
@@ -497,14 +503,21 @@
         state.reviewersByPhase = res.reviewersByPhase || null;
         state.view = 'trainee';
       } else if(res.mode==='detail'){
+        // Deliberately not touching state.view here (or below, for
+        // 'roster') — this response can resolve after the user has already
+        // navigated elsewhere (a slow background poll racing a click), and
+        // forcing the view to match a stale request used to snap them back
+        // to a screen they'd already left. Whichever view is current when
+        // this arrives already reflects the latest explicit navigation
+        // (openTrainee/backToRoster/openAdmin/openProgram all set state.view
+        // themselves before calling loadState()), so the response only
+        // needs to update the data those views read.
         applyFetchedItems(res.items);
         state.trainee = res.trainee;
-        state.isOwnTrainee = false;
+        state.isOwnTrainee = !!res.isOwn;
         state.reviewersByPhase = res.reviewersByPhase || null;
-        state.view = 'trainee';
       } else if(res.mode==='roster'){
         state.roster = Array.isArray(res.trainees) ? res.trainees : [];
-        if(state.view!=='admin' && state.view!=='program') state.view = 'roster';
       }
       ensureActivePhase();
       render();
@@ -677,7 +690,7 @@
     html += '<div id="app-inner">';
     html += '<div id="banner" class="'+(state.offline?'show':'')+'">Can\'t reach the tracking sheet — showing the last known state. Changes will retry automatically.</div>';
     html += renderHeader();
-    if(!isTraineeAcct()){ html += renderTabs(); }
+    html += renderTabs();
 
     if(state.view==='admin' && isAdminAcct()){
       html += renderAdmin();
@@ -711,8 +724,9 @@
         '<div class="docmeta">' +
           '<span>Doc CDP-001 &middot; Rev 01</span>' +
           '<a href="'+PDF_URL+'" target="_blank" rel="noopener">View CDP-001 PDF</a>' +
-          (state.view==='trainee' && state.activeTraineeId && !isTraineeAcct() ? '<span id="backToRosterBtn" class="linklike">&larr; back to roster</span>' : '') +
-          (state.view==='trainee' && state.activeTraineeId && isSupervisorAcct() ? '<span id="programInfoBtn" class="linklike">edit employee info</span>' : '') +
+          (state.view==='trainee' && state.activeTraineeId ? '<span id="backToRosterBtn" class="linklike">&larr; back to roster</span>' : '') +
+          (state.view==='trainee' && state.activeTraineeId && canManageActiveTrainee() ? '<span id="programInfoBtn" class="linklike">edit employee info</span>' : '') +
+          (acc.traineeId && !(state.view==='trainee' && state.activeTraineeId===acc.traineeId) ? '<span id="myDevBtn" class="linklike">my development</span>' : '') +
         '</div>' +
       '</div>' +
       '<div class="top-right">' +
@@ -741,7 +755,7 @@
   /* ---------------- roster ---------------- */
   function renderRoster(){
     if(!state.roster || state.roster.length===0){
-      return '<div class="hint">No one on the roster yet.'+(isAdminAcct()?' Add someone from <b>Manage Accounts</b>.':' Ask an admin to add someone.')+'</div>';
+      return '<div class="hint">'+(isAdminAcct()?'No one on the roster yet. Add someone from <b>Manage Accounts</b>.':'No one reports to you yet — an admin sets that up per Key Objective in Manage Program.'+(state.account&&state.account.traineeId?' Use <b>my development</b> above to see your own checklist.':''))+'</div>';
     }
     var out = '<div class="roster-grid">';
     state.roster.forEach(function(t){
@@ -859,7 +873,7 @@
       if(it.ReviewNote){ out += '<div class="note-box changes">'+esc(it.ReviewNote)+'</div>'; }
     }
 
-    var canActAsTrainee = isTraineeAcct() && state.isOwnTrainee;
+    var canActAsTrainee = state.isOwnTrainee;
     var canActAsSupervisor = isReviewerForPhase(def.Phase);
 
     if(canActAsTrainee && (it.Status==='open' || it.Status==='changes')){
@@ -920,7 +934,9 @@
         '<td>'+esc(a.email||'—')+'</td>' +
         '<td><span class="pill active">active</span></td>' +
         '<td style="white-space:nowrap;">' +
+          '<button class="btn btn-ghost btn-sm" data-edit-account="'+esc(a.accountId)+'">Edit</button> ' +
           '<button class="btn btn-ghost btn-sm" data-reset-account="'+esc(a.accountId)+'">Reset password</button> ' +
+          '<button class="btn btn-danger-outline btn-sm" data-delete-account="'+esc(a.accountId)+'">Delete</button>' +
         '</td>' +
       '</tr>';
     });
@@ -944,7 +960,7 @@
         '<div class="field-group"><label>Password</label><input type="text" id="newAcctPassword" data-draft="password" placeholder="min. 6 characters" value="'+esc(d.password)+'"></div>' +
         '<div class="field-group"><button class="btn btn-primary" id="createAcctBtn">Create account</button></div>' +
       '</div>' +
-      '<p class="hint">Choosing role <b>Trainee</b> creates a new employee record on the selected Track too, and seeds their checklist from that Track\'s Key Objectives automatically.</p>' +
+      '<p class="hint">Every role except <b>Admin</b> creates a personal career-development record on the selected Track too, and seeds their checklist from that Track\'s Key Objectives automatically.</p>' +
     '</div>';
 
     return out;
@@ -985,12 +1001,15 @@
       phasesInTrack.forEach(function(p){ out += renderProgramPhase(p); });
 
       var np = state.newPhaseDraft;
+      if(!np.reviewerAccountIds) np.reviewerAccountIds = [];
       out += '<div class="program-sub"><h3>Create Key Objective'+(currentTrack?(' on '+esc(currentTrack.name)):'')+'</h3><div class="create-form">' +
           '<div class="field-group"><label>Title</label><input type="text" data-newphase="title" value="'+esc(np.title)+'"></div>' +
           '<div class="field-group"><label>Tag</label><input type="text" data-newphase="tag" placeholder="e.g. 1, 2A" value="'+esc(np.tag)+'"></div>' +
           '<div class="field-group"><label>Timeframe</label><input type="text" data-newphase="range" placeholder="e.g. Months 1–3" value="'+esc(np.range)+'"></div>' +
           '<div class="field-group"><label>Location</label><input type="text" data-newphase="location" value="'+esc(np.location)+'"></div>' +
-          '<div class="field-group"><label>Reports to</label><input type="text" data-newphase="reporting" value="'+esc(np.reporting)+'"></div>' +
+          '<div class="field-group"><label>Reports to <span class="hint">(who reviews this — pick one or more)</span></label><select multiple data-newphase-reviewers style="min-height:88px;">' +
+            multiSelectOptions(state.program.accounts, np.reviewerAccountIds) +
+          '</select></div>' +
           '<div class="field-group"><label>Key output</label><input type="text" data-newphase="output" value="'+esc(np.output)+'"></div>' +
           '<div class="field-group" style="grid-column:1/-1"><label>Description</label><textarea class="field-input" data-newphase="objective">'+esc(np.objective)+'</textarea></div>' +
           '<div class="field-group"><button class="btn btn-primary" id="createPhaseBtn">Create Key Objective</button></div>' +
@@ -1019,6 +1038,13 @@
     return out;
   }
 
+  function multiSelectOptions(accounts, selectedIds){
+    return accounts.map(function(a){ return '<option value="'+esc(a.accountId)+'"'+(selectedIds.indexOf(a.accountId)!==-1?' selected':'')+'>'+esc(a.name)+' ('+esc(a.role)+')</option>'; }).join('');
+  }
+  function readMultiSelect(el){
+    return Array.prototype.filter.call(el.options, function(o){ return o.selected; }).map(function(o){ return o.value; });
+  }
+
   function renderProgramTrack(t){
     if(!state.trackDrafts[t.id]){ state.trackDrafts[t.id] = {name:t.name, description:t.description}; }
     var d = state.trackDrafts[t.id];
@@ -1036,7 +1062,10 @@
 
   function renderProgramPhase(p){
     if(!state.phaseDrafts[p.id]){
-      state.phaseDrafts[p.id] = {title:p.title, tag:p.tag, range:p.range, location:p.location, reporting:p.reporting, output:p.output, objective:p.objective, trackId:p.trackId};
+      var currentDefaultIds = state.program.reviewerAssignments
+        .filter(function(a){ return String(a.PhaseId)===String(p.id) && !a.TraineeId; })
+        .map(function(a){ return a.ReviewerAccountId; });
+      state.phaseDrafts[p.id] = {title:p.title, tag:p.tag, range:p.range, location:p.location, output:p.output, objective:p.objective, trackId:p.trackId, reviewerAccountIds:currentDefaultIds};
     }
     var d = state.phaseDrafts[p.id];
     var isOpen = !!state.expandedProgram[p.id];
@@ -1061,7 +1090,9 @@
           '</select></div>' +
           '<div class="field-group"><label>Timeframe</label><input type="text" data-phasefield="'+esc(p.id)+':range" value="'+esc(d.range)+'"></div>' +
           '<div class="field-group"><label>Location</label><input type="text" data-phasefield="'+esc(p.id)+':location" value="'+esc(d.location)+'"></div>' +
-          '<div class="field-group"><label>Reports to</label><input type="text" data-phasefield="'+esc(p.id)+':reporting" value="'+esc(d.reporting)+'"></div>' +
+          '<div class="field-group"><label>Reports to <span class="hint">(who reviews this — pick one or more)</span></label><select multiple data-phasefield-reviewers="'+esc(p.id)+'" style="min-height:88px;">' +
+            multiSelectOptions(state.program.accounts, d.reviewerAccountIds) +
+          '</select></div>' +
           '<div class="field-group"><label>Key output</label><input type="text" data-phasefield="'+esc(p.id)+':output" value="'+esc(d.output)+'"></div>' +
           '<div class="field-group" style="grid-column:1/-1"><label>Description</label><textarea class="field-input" data-phasefield="'+esc(p.id)+':objective">'+esc(d.objective)+'</textarea></div>' +
         '</div>' +
@@ -1106,19 +1137,18 @@
   }
 
   function renderProgramReviewers(phaseId){
-    var assignments = state.program.reviewerAssignments.filter(function(a){ return String(a.PhaseId)===String(phaseId); });
+    var overrides = state.program.reviewerAssignments.filter(function(a){ return String(a.PhaseId)===String(phaseId) && a.TraineeId; });
     var accountsById = {}; state.program.accounts.forEach(function(a){ accountsById[a.accountId] = a; });
     var traineesById = {}; state.program.trainees.forEach(function(t){ traineesById[t.TraineeId] = t.Name; });
-    var eligibleAccounts = state.program.accounts.filter(function(a){ return a.role==='Admin' || SUPERVISOR_ROLES.indexOf(a.role)!==-1; });
 
-    var out = '<div class="program-sub"><h3>Who Reviews This</h3>' +
-      '<p class="hint">Set a program-wide default reviewer, or override it for one specific employee. With nothing set here, anyone with a supervisor-level role can review.</p>' +
+    var out = '<div class="program-sub"><h3>Per-Employee Overrides</h3>' +
+      '<p class="hint">The "Reports to" picker above sets the default reviewer(s) for everyone on this objective. Add an override here only when one specific employee needs a different reviewer.</p>' +
       '<div>';
-    if(assignments.length===0){ out += '<span class="hint">No reviewers assigned yet.</span>'; }
-    assignments.forEach(function(a){
+    if(overrides.length===0){ out += '<span class="hint">No overrides set.</span>'; }
+    overrides.forEach(function(a){
       var acc = accountsById[a.ReviewerAccountId];
       var accName = esc(acc?acc.name:a.ReviewerAccountId);
-      var label = a.TraineeId ? (esc(traineesById[a.TraineeId]||a.TraineeId)+' &rarr; '+accName) : ('All employees &rarr; '+accName);
+      var label = esc(traineesById[a.TraineeId]||a.TraineeId)+' &rarr; '+accName;
       out += '<span class="reviewer-chip">'+label+'<button data-removereviewer="'+esc(a.AssignmentId)+'" title="Remove">&times;</button></span>';
     });
     out += '</div>';
@@ -1126,14 +1156,14 @@
     var nd = state.newReviewerDraft[phaseId] || {traineeId:'', accountId:''};
     out += '<div class="inline-add-row">' +
         '<select data-newreviewer-trainee="'+esc(phaseId)+'">' +
-          '<option value="">All employees (default)</option>' +
-          state.program.trainees.map(function(t){ return '<option value="'+esc(t.TraineeId)+'"'+(nd.traineeId===t.TraineeId?' selected':'')+'>'+esc(t.Name)+' only</option>'; }).join('') +
+          '<option value="">Employee…</option>' +
+          state.program.trainees.map(function(t){ return '<option value="'+esc(t.TraineeId)+'"'+(nd.traineeId===t.TraineeId?' selected':'')+'>'+esc(t.Name)+'</option>'; }).join('') +
         '</select>' +
         '<select data-newreviewer-account="'+esc(phaseId)+'">' +
           '<option value="">Reviewer…</option>' +
-          eligibleAccounts.map(function(a){ return '<option value="'+esc(a.accountId)+'"'+(nd.accountId===a.accountId?' selected':'')+'>'+esc(a.name)+' ('+esc(a.role)+')</option>'; }).join('') +
+          multiSelectOptions(state.program.accounts, nd.accountId?[nd.accountId]:[]) +
         '</select>' +
-        '<button class="btn btn-ghost btn-sm" data-addreviewer="'+esc(phaseId)+'">Add reviewer</button>' +
+        '<button class="btn btn-ghost btn-sm" data-addreviewer="'+esc(phaseId)+'">Add override</button>' +
       '</div></div>';
     return out;
   }
@@ -1217,6 +1247,57 @@
     });
   }
 
+  function showEditAccountModal(accountId){
+    if(document.getElementById('editAcctVeil')) return;
+    var account = (state.admin.accounts||[]).filter(function(a){ return a.accountId===accountId; })[0];
+    if(!account) return;
+    var traineeTrackIdById = {};
+    (state.admin.trainees||[]).forEach(function(t){ traineeTrackIdById[t.TraineeId] = t.TrackId; });
+    var currentTrackId = account.traineeId ? (traineeTrackIdById[account.traineeId]||'') : '';
+    var tracks = state.admin.tracks || [];
+    var showTrack = account.role !== 'Admin';
+
+    var veil = document.createElement('div');
+    veil.className = 'modal-veil'; veil.id = 'editAcctVeil';
+    veil.innerHTML = '<div class="modal">' +
+      '<h2>Edit account</h2>' +
+      '<p class="sub">'+esc(account.role)+'</p>' +
+      '<div class="field-group"><label>Name</label><input type="text" id="editAcctName" value="'+esc(account.name)+'"></div>' +
+      '<div class="field-group"><label>Username</label><input type="text" id="editAcctUsername" value="'+esc(account.username)+'"></div>' +
+      '<div class="field-group"><label>Email</label><input type="email" id="editAcctEmail" value="'+esc(account.email||'')+'"></div>' +
+      (showTrack ? '<div class="field-group"><label>Track</label><select id="editAcctTrack">' +
+          tracks.map(function(t){ return '<option value="'+esc(t.id)+'"'+(currentTrackId===t.id?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('') +
+        '</select>'+(!account.traineeId?'<span class="hint">This account has no career-development record yet — saving will create one on the selected Track.</span>':'')+'</div>' : '') +
+      '<div id="editAcctError" class="error-text" hidden></div>' +
+      '<div class="action-row"><button class="btn btn-primary" id="editAcctSave">Save</button><button class="btn btn-ghost" id="editAcctCancel">Cancel</button></div>' +
+    '</div>';
+    document.body.appendChild(veil);
+    document.getElementById('editAcctCancel').addEventListener('click', function(){ veil.remove(); });
+    document.getElementById('editAcctSave').addEventListener('click', function(){
+      var payload = {
+        accountId: accountId,
+        name: document.getElementById('editAcctName').value.trim(),
+        username: document.getElementById('editAcctUsername').value.trim(),
+        email: document.getElementById('editAcctEmail').value.trim()
+      };
+      var trackSel = document.getElementById('editAcctTrack');
+      if(trackSel) payload.trackId = trackSel.value;
+      apiPost('updateAccount', payload).then(function(res){
+        if(!res.ok){ var e=document.getElementById('editAcctError'); e.hidden=false; e.textContent=res.error||'Failed'; return; }
+        veil.remove();
+        loadAdmin();
+      });
+    });
+  }
+
+  function deleteAccount(accountId){
+    if(!confirm('Delete this account? They will no longer be able to log in. Their career-development history (if any) stays on the roster.')) return;
+    apiPost('deleteAccount', {accountId:accountId}).then(function(res){
+      if(!res.ok){ state.adminError = res.error || 'Could not delete account'; render(); return; }
+      state.adminError = ''; loadAdmin();
+    });
+  }
+
   /* ---------------- events ---------------- */
   function wireEvents(){
     var chip = document.getElementById('identityChip');
@@ -1225,6 +1306,8 @@
     if(back) back.addEventListener('click', backToRoster);
     var info = document.getElementById('programInfoBtn');
     if(info) info.addEventListener('click', showTraineeInfoModal);
+    var myDev = document.getElementById('myDevBtn');
+    if(myDev) myDev.addEventListener('click', function(){ openTrainee(state.account.traineeId); });
 
     Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function(btn){
       btn.addEventListener('click', function(){
@@ -1271,6 +1354,12 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-reset-account]'), function(btn){
       btn.addEventListener('click', function(){ showResetPasswordModal(btn.getAttribute('data-reset-account')); });
     });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-edit-account]'), function(btn){
+      btn.addEventListener('click', function(){ showEditAccountModal(btn.getAttribute('data-edit-account')); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-delete-account]'), function(btn){
+      btn.addEventListener('click', function(){ deleteAccount(btn.getAttribute('data-delete-account')); });
+    });
 
     Array.prototype.forEach.call(document.querySelectorAll('[data-draft]'), function(el){
       el.addEventListener('input', function(){ state.newAcctDraft[el.getAttribute('data-draft')] = el.value; });
@@ -1282,9 +1371,9 @@
     var trackWrap = document.getElementById('newAcctTrackWrap');
     if(roleSel && startWrap){
       var syncStartVisibility = function(){
-        var isTrainee = roleSel.value==='Trainee';
-        startWrap.style.display = isTrainee ? '' : 'none';
-        if(trackWrap) trackWrap.style.display = isTrainee ? '' : 'none';
+        var needsTrack = roleSel.value!=='Admin';
+        startWrap.style.display = needsTrack ? '' : 'none';
+        if(trackWrap) trackWrap.style.display = needsTrack ? '' : 'none';
       };
       syncStartVisibility();
       roleSel.addEventListener('change', syncStartVisibility);
@@ -1301,7 +1390,7 @@
           if(!res.ok){ state.adminError = res.error || 'Could not create account'; render(); return; }
           state.adminError = '';
           var keepTrack = state.newAcctDraft.trackId;
-          state.newAcctDraft = {name:'', username:'', role:'Trainee', startDate:'', trackId:keepTrack, email:'', password:''};
+          state.newAcctDraft = {name:'', username:'', role:'Engineer', startDate:'', trackId:keepTrack, email:'', password:''};
           loadAdmin();
         });
       });
@@ -1334,7 +1423,7 @@
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-savephase');
         var d = state.phaseDrafts[id] || {};
-        apiPost('updatePhase', {phaseId:id, title:d.title, tag:d.tag, trackId:d.trackId, range:d.range, location:d.location, reporting:d.reporting, output:d.output, objective:d.objective}).then(function(res){
+        apiPost('updatePhase', {phaseId:id, title:d.title, tag:d.tag, trackId:d.trackId, range:d.range, location:d.location, reviewerAccountIds:d.reviewerAccountIds, output:d.output, objective:d.objective}).then(function(res){
           if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
           state.programError = ''; loadProgram(); loadState();
         });
@@ -1423,8 +1512,8 @@
       btn.addEventListener('click', function(){
         var phaseId = btn.getAttribute('data-addreviewer');
         var d = state.newReviewerDraft[phaseId] || {};
-        if(!d.accountId) return;
-        apiPost('setReviewerAssignment', {phaseId:phaseId, traineeId:d.traineeId||'', reviewerAccountId:d.accountId}).then(function(res){
+        if(!d.accountId || !d.traineeId) return;
+        apiPost('setReviewerAssignment', {phaseId:phaseId, traineeId:d.traineeId, reviewerAccountId:d.accountId}).then(function(res){
           if(!res.ok){ state.programError = res.error || 'Could not add reviewer'; render(); return; }
           state.programError = ''; state.newReviewerDraft[phaseId] = {traineeId:'', accountId:''};
           loadProgram();
@@ -1444,15 +1533,26 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-newphase]'), function(el){
       el.addEventListener('input', function(){ state.newPhaseDraft[el.getAttribute('data-newphase')] = el.value; });
     });
+    var newPhaseReviewers = document.querySelector('[data-newphase-reviewers]');
+    if(newPhaseReviewers){
+      newPhaseReviewers.addEventListener('change', function(){ state.newPhaseDraft.reviewerAccountIds = readMultiSelect(newPhaseReviewers); });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-phasefield-reviewers]'), function(el){
+      el.addEventListener('change', function(){
+        var id = el.getAttribute('data-phasefield-reviewers');
+        if(!state.phaseDrafts[id]) state.phaseDrafts[id] = {};
+        state.phaseDrafts[id].reviewerAccountIds = readMultiSelect(el);
+      });
+    });
     var createPhaseBtn = document.getElementById('createPhaseBtn');
     if(createPhaseBtn){
       createPhaseBtn.addEventListener('click', function(){
         var d = state.newPhaseDraft;
         if(!d.title || !d.title.trim() || !state.programTrackFilter) return;
-        apiPost('createPhase', {title:d.title.trim(), trackId:state.programTrackFilter, tag:d.tag, range:d.range, location:d.location, reporting:d.reporting, output:d.output, objective:d.objective}).then(function(res){
+        apiPost('createPhase', {title:d.title.trim(), trackId:state.programTrackFilter, tag:d.tag, range:d.range, location:d.location, reviewerAccountIds:d.reviewerAccountIds||[], output:d.output, objective:d.objective}).then(function(res){
           if(!res.ok){ state.programError = res.error || 'Could not create'; render(); return; }
           state.programError = '';
-          state.newPhaseDraft = {title:'', tag:'', range:'', location:'', reporting:'', output:'', objective:'', trackId:state.programTrackFilter};
+          state.newPhaseDraft = {title:'', tag:'', range:'', location:'', reviewerAccountIds:[], output:'', objective:'', trackId:state.programTrackFilter};
           loadProgram(); loadState();
         });
       });
