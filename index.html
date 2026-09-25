@@ -494,7 +494,14 @@
         state.offline = true; render(); return;
       }
       state.offline = false; state.loaded = true;
-      if(Array.isArray(res.phases) && res.phases.length){ state.phases = res.phases; }
+      // Always replace, even with an empty array — a Track with zero Key
+      // Objectives yet is a real, valid state. Skipping the assignment when
+      // res.phases was empty used to leave state.phases holding whatever
+      // was loaded for a *previous* view (e.g. the admin's roster load,
+      // which returns every phase across every Track), so a brand-new
+      // Track with nothing on it yet would incorrectly keep showing
+      // another Track's leftover Key Objectives.
+      if(Array.isArray(res.phases)){ state.phases = res.phases; }
       if(res.mode==='trainee'){
         applyFetchedItems(res.items);
         state.trainee = res.trainee;
