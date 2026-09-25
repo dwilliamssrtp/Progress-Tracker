@@ -14,13 +14,16 @@
  * it for updates. Re-running setup() after an update is safe: it only fills
  * in sheets/rows that are missing, it never touches existing data.
  *
- * PROGRAM MODEL — the checklist is organized as a list of "Key Objectives"
- * (the `Phases` sheet — a stage of a career development plan, e.g. a
- * rotation, a project phase, a review period) each holding a list of
- * checklist items (the `ItemDefs` sheet — activities/criteria). Both are
- * fully admin-editable from the site (Manage Program tab) instead of being
- * hardcoded here; this file only seeds sensible starting content the first
- * time it runs, via setup().
+ * PROGRAM MODEL — employees belong to a `Tracks` entry (a role/program,
+ * e.g. "Engineer Trainee", "Sales", "Operations Manager"). The checklist
+ * is organized as a list of "Key Objectives" (the `Phases` sheet — a stage
+ * of a career development plan, e.g. a rotation, a project phase, a review
+ * period) each holding a list of checklist items (the `ItemDefs` sheet —
+ * activities/criteria). Every Key Objective belongs to exactly one Track,
+ * and an employee only ever sees the objectives on their own Track. Tracks,
+ * objectives and items are all admin-editable from the site (Manage
+ * Program tab) instead of being hardcoded here; this file only seeds
+ * sensible starting content the first time it runs, via setup().
  *
  * REVIEW HIERARCHY — `ReviewerAssignments` lets an admin say who is allowed
  * to review (approve / request changes / mark complete) each Key Objective.
@@ -48,18 +51,27 @@ var SHEET_SESSIONS = 'Sessions';
 var SHEET_PHASES = 'Phases';
 var SHEET_ITEMDEFS = 'ItemDefs';
 var SHEET_REVIEWERS = 'ReviewerAssignments';
+var SHEET_TRACKS = 'Tracks';
 
 var ITEM_HEADERS = ['TraineeId', 'ItemId', 'Phase', 'Kind', 'Order', 'Text', 'Status', 'Note',
   'SubmittedByName', 'SubmittedByRole', 'SubmittedAt',
   'ReviewedByName', 'ReviewedByRole', 'ReviewedAt', 'ReviewNote'];
 var HISTORY_HEADERS = ['RowId', 'TraineeId', 'ItemId', 'Phase', 'Action', 'ActorName', 'ActorRole', 'Timestamp', 'Detail'];
-var TRAINEE_HEADERS = ['TraineeId', 'Name', 'StartDate', 'Status', 'CreatedAt', 'CreatedBy'];
+// TrackId is appended at the END, not inserted earlier in the list — this
+// sheet may already have data from before Tracks existed, and ensureSheet_
+// only ever rewrites row 1 (the header). Appending keeps every existing
+// column's position (and therefore its data) untouched; inserting it
+// earlier would relabel already-populated columns without moving their
+// data, corrupting every existing row.
+var TRAINEE_HEADERS = ['TraineeId', 'Name', 'StartDate', 'Status', 'CreatedAt', 'CreatedBy', 'TrackId'];
 var ACCOUNT_HEADERS = ['AccountId', 'Username', 'Name', 'Role', 'TraineeId', 'Email',
   'PasswordHash', 'PasswordSalt', 'Active', 'CreatedAt', 'CreatedBy'];
 var SESSION_HEADERS = ['Token', 'AccountId', 'CreatedAt', 'ExpiresAt'];
-var PHASE_HEADERS = ['PhaseId', 'Tag', 'Title', 'RangeLabel', 'Location', 'ReportingLabel', 'Output', 'ObjectiveText', 'Order'];
+// Same append-only reasoning as TRAINEE_HEADERS above.
+var PHASE_HEADERS = ['PhaseId', 'Tag', 'Title', 'RangeLabel', 'Location', 'ReportingLabel', 'Output', 'ObjectiveText', 'Order', 'TrackId'];
 var ITEMDEF_HEADERS = ['ItemId', 'Phase', 'Kind', 'Text', 'Order'];
 var REVIEWER_HEADERS = ['AssignmentId', 'PhaseId', 'TraineeId', 'ReviewerAccountId', 'CreatedAt', 'CreatedBy'];
+var TRACK_HEADERS = ['TrackId', 'Name', 'Description', 'CreatedAt', 'CreatedBy'];
 
 var ROLES = ['Trainee', 'Manufacturing Manager', 'VP Production & Engineering', 'CTO', 'Admin', 'Viewer'];
 var SUPERVISOR_ROLES = ['Manufacturing Manager', 'VP Production & Engineering', 'CTO', 'Admin'];
@@ -154,21 +166,38 @@ function setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSheet_(ss, SHEET_ITEMS, ITEM_HEADERS);
   ensureSheet_(ss, SHEET_HISTORY, HISTORY_HEADERS);
-  ensureSheet_(ss, SHEET_TRAINEES, TRAINEE_HEADERS);
+  var trainees = ensureSheet_(ss, SHEET_TRAINEES, TRAINEE_HEADERS);
   var accounts = ensureSheet_(ss, SHEET_ACCOUNTS, ACCOUNT_HEADERS);
   ensureSheet_(ss, SHEET_SESSIONS, SESSION_HEADERS);
+  var tracks = ensureSheet_(ss, SHEET_TRACKS, TRACK_HEADERS);
   var phases = ensureSheet_(ss, SHEET_PHASES, PHASE_HEADERS);
   var itemDefs = ensureSheet_(ss, SHEET_ITEMDEFS, ITEMDEF_HEADERS);
   ensureSheet_(ss, SHEET_REVIEWERS, REVIEWER_HEADERS);
 
   var msg = 'Setup complete.';
 
+  var defaultTrackId = 'track_default';
+  if (tracks.getLastRow() < 2) {
+    tracks.appendRow([defaultTrackId, 'Engineer Trainee', 'The original engineering trainee career development program.', new Date(), 'setup()']);
+    msg += '\n\nSeeded the Tracks sheet with a default "Engineer Trainee" track. Add more tracks (Sales, Operations, etc.) from the site\'s Manage Program tab to build objectives for other roles.';
+  } else {
+    defaultTrackId = sheetToObjects_(tracks, TRACK_HEADERS)[0].TrackId;
+  }
+
   if (phases.getLastRow() < 2) {
     var phaseRows = PHASE_SEED.map(function (p) {
-      return [p.id, p.tag, p.title, p.rangeLabel, p.location, p.reportingLabel, p.output, p.objectiveText, p.order];
+      return [p.id, p.tag, p.title, p.rangeLabel, p.location, p.reportingLabel, p.output, p.objectiveText, p.order, defaultTrackId];
     });
     phases.getRange(2, 1, phaseRows.length, PHASE_HEADERS.length).setValues(phaseRows);
-    msg += '\n\nSeeded the Phases sheet with the default Key Objectives — edit/add/remove them from the site\'s Manage Program tab any time.';
+    msg += '\n\nSeeded the Phases sheet with the default Key Objectives, all under the default track — edit/add/remove them (and add other tracks) from the site\'s Manage Program tab any time.';
+  } else {
+    // Migration: back-fill TrackId on any Phases rows saved before Tracks existed.
+    var phaseObjs = sheetToObjects_(phases, PHASE_HEADERS);
+    var migratedPhases = 0;
+    phaseObjs.forEach(function (p, idx) {
+      if (!p.TrackId) { phases.getRange(idx + 2, PHASE_HEADERS.indexOf('TrackId') + 1).setValue(defaultTrackId); migratedPhases++; }
+    });
+    if (migratedPhases) msg += '\n\nAssigned ' + migratedPhases + ' existing Key Objective(s) to the default track.';
   }
 
   if (itemDefs.getLastRow() < 2) {
@@ -178,6 +207,14 @@ function setup() {
     itemDefs.getRange(2, 1, defRows.length, ITEMDEF_HEADERS.length).setValues(defRows);
     msg += '\n\nSeeded the ItemDefs sheet with the default checklist items.';
   }
+
+  // Migration: back-fill TrackId on any Trainees rows saved before Tracks existed.
+  var traineeObjs = sheetToObjects_(trainees, TRAINEE_HEADERS);
+  var migratedTrainees = 0;
+  traineeObjs.forEach(function (t, idx) {
+    if (!t.TrackId) { trainees.getRange(idx + 2, TRAINEE_HEADERS.indexOf('TrackId') + 1).setValue(defaultTrackId); migratedTrainees++; }
+  });
+  if (migratedTrainees) msg += '\n\nAssigned ' + migratedTrainees + ' existing employee(s) to the default track.';
 
   var existingAdmin = findAccountByUsername_('admin');
   if (!existingAdmin) {
@@ -277,6 +314,7 @@ function getItemsSheet_() { return ensureSheet_(SpreadsheetApp.getActiveSpreadsh
 function getPhasesSheet_() { return ensureSheet_(SpreadsheetApp.getActiveSpreadsheet(), SHEET_PHASES, PHASE_HEADERS); }
 function getItemDefsSheet_() { return ensureSheet_(SpreadsheetApp.getActiveSpreadsheet(), SHEET_ITEMDEFS, ITEMDEF_HEADERS); }
 function getReviewersSheet_() { return ensureSheet_(SpreadsheetApp.getActiveSpreadsheet(), SHEET_REVIEWERS, REVIEWER_HEADERS); }
+function getTracksSheet_() { return ensureSheet_(SpreadsheetApp.getActiveSpreadsheet(), SHEET_TRACKS, TRACK_HEADERS); }
 
 function findAccountByUsername_(username) {
   var sheet = getAccountsSheet_();
@@ -333,17 +371,34 @@ function requireAdmin_(acc) {
   if (acc.Role !== 'Admin') { var e = new Error('Admin only'); e.authError = true; throw e; }
 }
 
-/* ---------------- program config: phases & item defs ---------------- */
+/* ---------------- program config: tracks, phases & item defs ---------------- */
 
-function phasesList_() {
-  return sheetToObjects_(getPhasesSheet_(), PHASE_HEADERS)
+function tracksList_() {
+  return sheetToObjects_(getTracksSheet_(), TRACK_HEADERS).map(function (t) {
+    return { id: t.TrackId, name: t.Name, description: t.Description };
+  });
+}
+
+// Key Objectives, optionally filtered to one Track. Pass no trackId to get
+// every objective across every Track (used by the admin Manage Program view).
+function phasesList_(trackId) {
+  var rows = sheetToObjects_(getPhasesSheet_(), PHASE_HEADERS);
+  if (trackId) rows = rows.filter(function (p) { return String(p.TrackId) === String(trackId); });
+  return rows
     .sort(function (a, b) { return (a.Order || 0) - (b.Order || 0); })
     .map(function (p) {
       return {
-        id: p.PhaseId, tag: p.Tag, title: p.Title, range: p.RangeLabel, location: p.Location,
+        id: p.PhaseId, trackId: p.TrackId, tag: p.Tag, title: p.Title, range: p.RangeLabel, location: p.Location,
         reporting: p.ReportingLabel, output: p.Output, objective: p.ObjectiveText, order: p.Order
       };
     });
+}
+
+// The Key Objectives visible to one specific employee: only the ones on
+// their own Track.
+function phasesForTrainee_(traineeId) {
+  var t = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS).filter(function (x) { return String(x.TraineeId) === String(traineeId); })[0];
+  return phasesList_(t ? t.TrackId : '');
 }
 
 function itemDefsList_() {
@@ -384,11 +439,13 @@ function requireReviewer_(acc, phaseId, traineeId) {
 // end to show "Reviewed by" and to gate action buttons in the UI. Falls
 // back to listing everyone with a supervisor role when nothing is configured,
 // so the UI stays informative even before an admin sets up the hierarchy.
-function reviewersByPhaseFor_(traineeId) {
+// `phases` should be that employee's own Track's objectives (phasesForTrainee_);
+// defaults to every objective across every Track if omitted.
+function reviewersByPhaseFor_(traineeId, phases) {
   var accountsById = {};
   sheetToObjects_(getAccountsSheet_(), ACCOUNT_HEADERS).forEach(function (a) { accountsById[a.AccountId] = a; });
   var out = {};
-  phasesList_().forEach(function (p) {
+  (phases || phasesList_()).forEach(function (p) {
     var ids = reviewerIdsForPhase_(p.id, traineeId);
     var usingDefault = ids.length === 0;
     var list;
@@ -405,9 +462,10 @@ function reviewersByPhaseFor_(traineeId) {
 
 /* ---------------- trainees & items ---------------- */
 
-function seedItemsForTrainee_(traineeId) {
+function seedItemsForTrainee_(traineeId, trackId) {
   var sheet = getItemsSheet_();
-  var defs = itemDefsList_();
+  var phaseIds = phasesList_(trackId).map(function (p) { return p.id; });
+  var defs = itemDefsList_().filter(function (d) { return phaseIds.indexOf(d.Phase) !== -1; });
   var rows = defs.map(function (d) {
     return [traineeId, d.ItemId, d.Phase, d.Kind, d.Order, d.Text, 'open', '', '', '', '', '', '', '', ''];
   });
@@ -452,10 +510,13 @@ function traineeCounts_(traineeId) {
 
 function rosterList_() {
   var trainees = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS);
+  var trackNameById = {};
+  sheetToObjects_(getTracksSheet_(), TRACK_HEADERS).forEach(function (t) { trackNameById[t.TrackId] = t.Name; });
   return trainees.map(function (t) {
     var c = traineeCounts_(t.TraineeId);
     return {
       traineeId: t.TraineeId, name: t.Name, startDate: t.StartDate, status: t.Status,
+      trackId: t.TrackId || '', trackName: trackNameById[t.TrackId] || '',
       total: c.total, approved: c.approved, submitted: c.submitted
     };
   });
@@ -492,16 +553,16 @@ function doGet(e) {
   try {
     var acc = resolveSession_(e.parameter.token);
     if (!acc) return json_({ ok: false, error: 'auth', code: 'session_invalid' });
-    var phases = phasesList_();
 
     if (acc.Role === 'Trainee') {
       var trainee = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS).filter(function (t) { return String(t.TraineeId) === String(acc.TraineeId); })[0];
+      var myPhases = phasesForTrainee_(acc.TraineeId);
       return json_({
         ok: true, mode: 'trainee', account: publicAccount_(acc),
-        trainee: trainee ? { traineeId: trainee.TraineeId, name: trainee.Name, startDate: trainee.StartDate } : null,
+        trainee: trainee ? { traineeId: trainee.TraineeId, name: trainee.Name, startDate: trainee.StartDate, trackId: trainee.TrackId || '' } : null,
         items: itemsForTrainee_(acc.TraineeId),
-        phases: phases,
-        reviewersByPhase: reviewersByPhaseFor_(acc.TraineeId)
+        phases: myPhases,
+        reviewersByPhase: reviewersByPhaseFor_(acc.TraineeId, myPhases)
       });
     }
 
@@ -509,16 +570,17 @@ function doGet(e) {
     if (requestedTraineeId) {
       var t2 = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS).filter(function (t) { return String(t.TraineeId) === String(requestedTraineeId); })[0];
       if (!t2) return json_({ ok: false, error: 'Unknown employee' });
+      var theirPhases = phasesForTrainee_(requestedTraineeId);
       return json_({
         ok: true, mode: 'detail', account: publicAccount_(acc),
-        trainee: { traineeId: t2.TraineeId, name: t2.Name, startDate: t2.StartDate },
+        trainee: { traineeId: t2.TraineeId, name: t2.Name, startDate: t2.StartDate, trackId: t2.TrackId || '' },
         items: itemsForTrainee_(requestedTraineeId),
-        phases: phases,
-        reviewersByPhase: reviewersByPhaseFor_(requestedTraineeId)
+        phases: theirPhases,
+        reviewersByPhase: reviewersByPhaseFor_(requestedTraineeId, theirPhases)
       });
     }
 
-    return json_({ ok: true, mode: 'roster', account: publicAccount_(acc), trainees: rosterList_(), phases: phases });
+    return json_({ ok: true, mode: 'roster', account: publicAccount_(acc), trainees: rosterList_(), phases: phasesList_() });
   } catch (err) {
     return json_({ ok: false, error: String(err) });
   }
@@ -559,6 +621,10 @@ function doPost(e) {
       case 'deleteItemDef': return handleDeleteItemDef_(acc, body);
       case 'setReviewerAssignment': return handleSetReviewerAssignment_(acc, body);
       case 'removeReviewerAssignment': return handleRemoveReviewerAssignment_(acc, body);
+      case 'createTrack': return handleCreateTrack_(acc, body);
+      case 'updateTrack': return handleUpdateTrack_(acc, body);
+      case 'deleteTrack': return handleDeleteTrack_(acc, body);
+      case 'setTraineeTrack': return handleSetTraineeTrack_(acc, body);
       default: return json_({ ok: false, error: 'Unknown action: ' + body.action });
     }
   } catch (err) {
@@ -604,7 +670,7 @@ function handleListAccounts_(acc, body) {
   requireAdmin_(acc);
   var accounts = sheetToObjects_(getAccountsSheet_(), ACCOUNT_HEADERS).map(publicAccount_);
   var trainees = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS);
-  return json_({ ok: true, accounts: accounts, trainees: trainees });
+  return json_({ ok: true, accounts: accounts, trainees: trainees, tracks: tracksList_() });
 }
 
 function handleCreateAccount_(acc, body) {
@@ -619,9 +685,11 @@ function handleCreateAccount_(acc, body) {
 
   var traineeId = '';
   if (role === 'Trainee') {
+    var trackId = String(body.trackId || '').trim();
+    if (!trackId || findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', trackId) < 0) return json_({ ok: false, error: 'Choose a valid Track for this employee' });
     traineeId = newId_('t');
-    getTraineesSheet_().appendRow([traineeId, body.name, body.startDate || '', 'active', new Date(), acc.Name]);
-    seedItemsForTrainee_(traineeId);
+    getTraineesSheet_().appendRow([traineeId, body.name, body.startDate || '', 'active', new Date(), acc.Name, trackId]);
+    seedItemsForTrainee_(traineeId, trackId);
   }
 
   var accountId = createAccountRow_({
@@ -662,6 +730,7 @@ function handleListProgram_(acc, body) {
   var trainees = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS);
   return json_({
     ok: true,
+    tracks: tracksList_(),
     phases: phasesList_(),
     itemDefs: itemDefsList_(),
     reviewerAssignments: reviewerAssignments_(),
@@ -670,17 +739,79 @@ function handleListProgram_(acc, body) {
   });
 }
 
+function handleCreateTrack_(acc, body) {
+  requireAdmin_(acc);
+  var name = String(body.name || '').trim();
+  if (!name) return json_({ ok: false, error: 'Name is required' });
+  var id = body.trackId ? String(body.trackId) : newId_('track');
+  if (findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', id) >= 0) return json_({ ok: false, error: 'That Track ID is already used' });
+  getTracksSheet_().appendRow([id, name, body.description || '', new Date(), acc.Name]);
+  return json_({ ok: true, trackId: id });
+}
+
+function handleUpdateTrack_(acc, body) {
+  requireAdmin_(acc);
+  var sheet = getTracksSheet_();
+  var row = findRowIndex_(sheet, TRACK_HEADERS, 'TrackId', body.trackId);
+  if (row < 0) return json_({ ok: false, error: 'Unknown track' });
+  if (body.name !== undefined) sheet.getRange(row, TRACK_HEADERS.indexOf('Name') + 1).setValue(body.name);
+  if (body.description !== undefined) sheet.getRange(row, TRACK_HEADERS.indexOf('Description') + 1).setValue(body.description);
+  return json_({ ok: true });
+}
+
+function handleDeleteTrack_(acc, body) {
+  requireAdmin_(acc);
+  var trackId = body.trackId;
+  var row = findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', trackId);
+  if (row < 0) return json_({ ok: false, error: 'Unknown track' });
+  if (phasesList_(trackId).length) return json_({ ok: false, error: 'Move or delete this track\'s Key Objectives first' });
+  var traineesOnTrack = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS).filter(function (t) { return String(t.TrackId) === String(trackId); });
+  if (traineesOnTrack.length) return json_({ ok: false, error: 'Reassign employees off this track first' });
+  getTracksSheet_().deleteRow(row);
+  return json_({ ok: true });
+}
+
+// Move an employee onto a different Track. Their existing checklist history
+// is left alone (it just stops being shown, since the front end only
+// renders the objectives on the employee's current Track); any objectives
+// on the new Track they don't already have an item row for are seeded in
+// as 'open', same as a brand-new employee on that Track.
+function handleSetTraineeTrack_(acc, body) {
+  requireAdmin_(acc);
+  var sheet = getTraineesSheet_();
+  var row = findRowIndex_(sheet, TRAINEE_HEADERS, 'TraineeId', body.traineeId);
+  if (row < 0) return json_({ ok: false, error: 'Unknown employee' });
+  if (findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', body.trackId) < 0) return json_({ ok: false, error: 'Unknown track' });
+
+  sheet.getRange(row, TRAINEE_HEADERS.indexOf('TrackId') + 1).setValue(body.trackId);
+
+  var existingItemIds = {};
+  itemsForTrainee_(body.traineeId).forEach(function (it) { existingItemIds[it.ItemId] = true; });
+  var phaseIds = phasesList_(body.trackId).map(function (p) { return p.id; });
+  var defs = itemDefsList_().filter(function (d) { return phaseIds.indexOf(d.Phase) !== -1 && !existingItemIds[d.ItemId]; });
+  var rows = defs.map(function (d) {
+    return [body.traineeId, d.ItemId, d.Phase, d.Kind, d.Order, d.Text, 'open', '', '', '', '', '', '', '', ''];
+  });
+  if (rows.length) {
+    var itemsSheet = getItemsSheet_();
+    itemsSheet.getRange(itemsSheet.getLastRow() + 1, 1, rows.length, ITEM_HEADERS.length).setValues(rows);
+  }
+  return json_({ ok: true });
+}
+
 function handleCreatePhase_(acc, body) {
   requireAdmin_(acc);
   var title = String(body.title || '').trim();
   if (!title) return json_({ ok: false, error: 'Title is required' });
+  var trackId = String(body.trackId || '').trim();
+  if (!trackId || findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', trackId) < 0) return json_({ ok: false, error: 'Choose a valid Track' });
   var id = body.phaseId ? String(body.phaseId) : newId_('phase');
   if (findRowIndex_(getPhasesSheet_(), PHASE_HEADERS, 'PhaseId', id) >= 0) return json_({ ok: false, error: 'That Key Objective ID is already used' });
-  var existing = phasesList_();
+  var existing = phasesList_(trackId);
   var order = body.order !== undefined ? body.order : (existing.length ? Math.max.apply(null, existing.map(function (p) { return Number(p.order) || 0; })) + 1 : 1);
   getPhasesSheet_().appendRow([
     id, body.tag || title.slice(0, 3).toUpperCase(), title, body.range || '', body.location || '',
-    body.reporting || '', body.output || '', body.objective || '', order
+    body.reporting || '', body.output || '', body.objective || '', order, trackId
   ]);
   return json_({ ok: true, phaseId: id });
 }
@@ -690,6 +821,10 @@ function handleUpdatePhase_(acc, body) {
   var sheet = getPhasesSheet_();
   var row = findRowIndex_(sheet, PHASE_HEADERS, 'PhaseId', body.phaseId);
   if (row < 0) return json_({ ok: false, error: 'Unknown Key Objective' });
+  if (body.trackId !== undefined) {
+    if (findRowIndex_(getTracksSheet_(), TRACK_HEADERS, 'TrackId', body.trackId) < 0) return json_({ ok: false, error: 'Unknown track' });
+    sheet.getRange(row, PHASE_HEADERS.indexOf('TrackId') + 1).setValue(body.trackId);
+  }
   var fieldMap = { tag: 'Tag', title: 'Title', range: 'RangeLabel', location: 'Location', reporting: 'ReportingLabel', output: 'Output', objective: 'ObjectiveText', order: 'Order' };
   Object.keys(fieldMap).forEach(function (k) {
     if (body[k] !== undefined) sheet.getRange(row, PHASE_HEADERS.indexOf(fieldMap[k]) + 1).setValue(body[k]);
@@ -716,9 +851,12 @@ function handleCreateItemDef_(acc, body) {
   var phase = body.phase;
   var kind = body.kind;
   var text = String(body.text || '').trim();
-  if (!phase || findRowIndex_(getPhasesSheet_(), PHASE_HEADERS, 'PhaseId', phase) < 0) return json_({ ok: false, error: 'Unknown Key Objective' });
+  var phaseRow = findRowIndex_(getPhasesSheet_(), PHASE_HEADERS, 'PhaseId', phase);
+  if (!phase || phaseRow < 0) return json_({ ok: false, error: 'Unknown Key Objective' });
   if (!text) return json_({ ok: false, error: 'Description is required' });
   if (['activity', 'criterion'].indexOf(kind) === -1) return json_({ ok: false, error: 'Invalid kind' });
+
+  var phaseTrackId = getPhasesSheet_().getRange(phaseRow, PHASE_HEADERS.indexOf('TrackId') + 1).getValue();
 
   var id = body.itemId ? String(body.itemId) : newId_('item');
   var existing = itemDefsList_().filter(function (d) { return d.Phase === phase; });
@@ -726,9 +864,10 @@ function handleCreateItemDef_(acc, body) {
 
   getItemDefsSheet_().appendRow([id, phase, kind, text, order]);
 
-  // Add this item to every existing employee's checklist so it shows up
-  // immediately without them having to be re-seeded.
-  var trainees = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS);
+  // Add this item to the checklist of every existing employee on this
+  // objective's Track (not everyone) so it shows up immediately without
+  // them having to be re-seeded.
+  var trainees = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS).filter(function (t) { return String(t.TrackId) === String(phaseTrackId); });
   var itemsSheet = getItemsSheet_();
   var rows = trainees.map(function (t) {
     return [t.TraineeId, id, phase, kind, order, text, 'open', '', '', '', '', '', '', '', ''];
