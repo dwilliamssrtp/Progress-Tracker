@@ -172,6 +172,12 @@
   .btn-ghost:hover{ background:var(--surface-2); }
   .btn-sm{ padding:5px 10px; font-size:11.5px; }
   .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .btn .spinner{
+    display:inline-block; width:11px; height:11px; margin-right:7px; margin-bottom:-1px;
+    border:2px solid currentColor; border-right-color:transparent; border-radius:50%;
+    opacity:.85; animation:btn-spin .6s linear infinite;
+  }
+  @keyframes btn-spin{ to{ transform:rotate(360deg); } }
   .hint{ font-size:11.5px; color:var(--ink-faint); }
   .error-text{ font-size:12.5px; color:var(--changes); }
 
@@ -437,7 +443,7 @@
       render();
       return;
     }
-    fetch(API_URL, {method:'POST', body: JSON.stringify({action:'login', username:username, password:password})})
+    return fetch(API_URL, {method:'POST', body: JSON.stringify({action:'login', username:username, password:password})})
       .then(function(r){ return r.json(); })
       .then(function(res){
         if(!res.ok){ state.loginError = res.error || 'Login failed'; render(); return; }
@@ -701,13 +707,14 @@
         '<p class="hint" style="margin-top:14px;">New here? Ask your admin for a username and password.</p>' +
       '</div></div>';
 
+    var loginBtn = document.getElementById('loginBtn');
     var go = function(){
       var u = document.getElementById('loginUser').value.trim();
       var p = document.getElementById('loginPass').value;
       if(!u || !p) return;
-      login(u, p);
+      withButtonBusy(loginBtn, function(){ return login(u, p); });
     };
-    document.getElementById('loginBtn').addEventListener('click', go);
+    loginBtn.addEventListener('click', go);
     ['loginUser','loginPass'].forEach(function(id){
       document.getElementById(id).addEventListener('keydown', function(e){ if(e.key==='Enter') go(); });
     });
@@ -1229,15 +1236,18 @@
     document.body.appendChild(veil);
     document.getElementById('pwCancel').addEventListener('click', function(){ veil.remove(); });
     document.getElementById('logoutBtn').addEventListener('click', function(){ veil.remove(); clearAuth(); render(); });
-    document.getElementById('pwSave').addEventListener('click', function(){
+    var pwSaveBtn = document.getElementById('pwSave');
+    pwSaveBtn.addEventListener('click', function(){
       var oldPw = document.getElementById('pwOld').value;
       var newPw = document.getElementById('pwNew').value;
-      apiPost('changePassword', {oldPassword:oldPw, newPassword:newPw}).then(function(res){
-        if(!res.ok){
-          var e = document.getElementById('pwError'); e.hidden=false; e.textContent = res.error || 'Could not change password';
-          return;
-        }
-        veil.remove();
+      withButtonBusy(pwSaveBtn, function(){
+        return apiPost('changePassword', {oldPassword:oldPw, newPassword:newPw}).then(function(res){
+          if(!res.ok){
+            var e = document.getElementById('pwError'); e.hidden=false; e.textContent = res.error || 'Could not change password';
+            return;
+          }
+          veil.remove();
+        });
       });
     });
   }
@@ -1277,11 +1287,14 @@
     '</div>';
     document.body.appendChild(veil);
     document.getElementById('resetCancel').addEventListener('click', function(){ veil.remove(); });
-    document.getElementById('resetSave').addEventListener('click', function(){
+    var resetSaveBtn = document.getElementById('resetSave');
+    resetSaveBtn.addEventListener('click', function(){
       var pw = document.getElementById('resetPw').value;
-      apiPost('resetPassword', {accountId:accountId, newPassword:pw}).then(function(res){
-        if(!res.ok){ var e=document.getElementById('resetError'); e.hidden=false; e.textContent=res.error||'Failed'; return; }
-        veil.remove();
+      withButtonBusy(resetSaveBtn, function(){
+        return apiPost('resetPassword', {accountId:accountId, newPassword:pw}).then(function(res){
+          if(!res.ok){ var e=document.getElementById('resetError'); e.hidden=false; e.textContent=res.error||'Failed'; return; }
+          veil.remove();
+        });
       });
     });
   }
@@ -1312,7 +1325,8 @@
     '</div>';
     document.body.appendChild(veil);
     document.getElementById('editAcctCancel').addEventListener('click', function(){ veil.remove(); });
-    document.getElementById('editAcctSave').addEventListener('click', function(){
+    var editAcctSaveBtn = document.getElementById('editAcctSave');
+    editAcctSaveBtn.addEventListener('click', function(){
       var payload = {
         accountId: accountId,
         name: document.getElementById('editAcctName').value.trim(),
@@ -1321,19 +1335,23 @@
       };
       var trackSel = document.getElementById('editAcctTrack');
       if(trackSel) payload.trackId = trackSel.value;
-      apiPost('updateAccount', payload).then(function(res){
-        if(!res.ok){ var e=document.getElementById('editAcctError'); e.hidden=false; e.textContent=res.error||'Failed'; return; }
-        veil.remove();
-        loadAdmin();
+      withButtonBusy(editAcctSaveBtn, function(){
+        return apiPost('updateAccount', payload).then(function(res){
+          if(!res.ok){ var e=document.getElementById('editAcctError'); e.hidden=false; e.textContent=res.error||'Failed'; return; }
+          veil.remove();
+          loadAdmin();
+        });
       });
     });
   }
 
-  function deleteAccount(accountId){
+  function deleteAccount(accountId, btn){
     if(!confirm('Delete this account? They will no longer be able to log in. Their career-development history (if any) stays on the roster.')) return;
-    apiPost('deleteAccount', {accountId:accountId}).then(function(res){
-      if(!res.ok){ state.adminError = res.error || 'Could not delete account'; render(); return; }
-      state.adminError = ''; loadAdmin();
+    withButtonBusy(btn, function(){
+      return apiPost('deleteAccount', {accountId:accountId}).then(function(res){
+        if(!res.ok){ state.adminError = res.error || 'Could not delete account'; render(); return; }
+        state.adminError = ''; loadAdmin();
+      });
     });
   }
 
@@ -1397,7 +1415,7 @@
       btn.addEventListener('click', function(){ showEditAccountModal(btn.getAttribute('data-edit-account')); });
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-delete-account]'), function(btn){
-      btn.addEventListener('click', function(){ deleteAccount(btn.getAttribute('data-delete-account')); });
+      btn.addEventListener('click', function(){ deleteAccount(btn.getAttribute('data-delete-account'), btn); });
     });
 
     Array.prototype.forEach.call(document.querySelectorAll('[data-draft]'), function(el){
@@ -1425,12 +1443,14 @@
           name: d.name.trim(), username: d.username.trim(), role: d.role,
           email: d.email.trim(), password: d.password, startDate: d.startDate, trackId: d.trackId
         };
-        apiPost('createAccount', payload).then(function(res){
-          if(!res.ok){ state.adminError = res.error || 'Could not create account'; render(); return; }
-          state.adminError = '';
-          var keepTrack = state.newAcctDraft.trackId;
-          state.newAcctDraft = {name:'', username:'', role:'Engineer', startDate:'', trackId:keepTrack, email:'', password:''};
-          loadAdmin();
+        withButtonBusy(createBtn, function(){
+          return apiPost('createAccount', payload).then(function(res){
+            if(!res.ok){ state.adminError = res.error || 'Could not create account'; render(); return; }
+            state.adminError = '';
+            var keepTrack = state.newAcctDraft.trackId;
+            state.newAcctDraft = {name:'', username:'', role:'Engineer', startDate:'', trackId:keepTrack, email:'', password:''};
+            loadAdmin();
+          });
         });
       });
     }
@@ -1462,9 +1482,11 @@
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-savephase');
         var d = state.phaseDrafts[id] || {};
-        apiPost('updatePhase', {phaseId:id, title:d.title, tag:d.tag, trackId:d.trackId, range:d.range, location:d.location, reviewerAccountIds:d.reviewerAccountIds, output:d.output, objective:d.objective}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
-          state.programError = ''; loadProgram(); loadState();
+        withButtonBusy(btn, function(){
+          return apiPost('updatePhase', {phaseId:id, title:d.title, tag:d.tag, trackId:d.trackId, range:d.range, location:d.location, reviewerAccountIds:d.reviewerAccountIds, output:d.output, objective:d.objective}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
+            state.programError = ''; loadProgram(); loadState();
+          });
         });
       });
     });
@@ -1473,10 +1495,12 @@
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-deletephase');
         if(!confirm('Delete this Key Objective and all of its checklist items for every employee? This cannot be undone.')) return;
-        apiPost('deletePhase', {phaseId:id}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not delete'; render(); return; }
-          delete state.phaseDrafts[id]; delete state.expandedProgram[id];
-          state.programError = ''; loadProgram(); loadState();
+        withButtonBusy(btn, function(){
+          return apiPost('deletePhase', {phaseId:id}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not delete'; render(); return; }
+            delete state.phaseDrafts[id]; delete state.expandedProgram[id];
+            state.programError = ''; loadProgram(); loadState();
+          });
         });
       });
     });
@@ -1488,9 +1512,11 @@
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-saveitem');
         var text = state.phaseDrafts['item:'+id];
-        apiPost('updateItemDef', {itemId:id, text:text}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
-          state.programError = ''; loadProgram(); loadState();
+        withButtonBusy(btn, function(){
+          return apiPost('updateItemDef', {itemId:id, text:text}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
+            state.programError = ''; loadProgram(); loadState();
+          });
         });
       });
     });
@@ -1498,9 +1524,11 @@
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-deleteitem');
         if(!confirm('Delete this checklist item for every employee? This cannot be undone.')) return;
-        apiPost('deleteItemDef', {itemId:id}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not delete'; render(); return; }
-          state.programError = ''; loadProgram(); loadState();
+        withButtonBusy(btn, function(){
+          return apiPost('deleteItemDef', {itemId:id}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not delete'; render(); return; }
+            state.programError = ''; loadProgram(); loadState();
+          });
         });
       });
     });
@@ -1525,10 +1553,12 @@
         var d = state.newItemDraft[phaseId] || {kind:'activity', text:''};
         var text = (d.text||'').trim();
         if(!text) return;
-        apiPost('createItemDef', {phase:phaseId, kind:d.kind, text:text}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not add item'; render(); return; }
-          state.programError = ''; state.newItemDraft[phaseId] = {kind:'activity', text:''};
-          loadProgram(); loadState();
+        withButtonBusy(btn, function(){
+          return apiPost('createItemDef', {phase:phaseId, kind:d.kind, text:text}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not add item'; render(); return; }
+            state.programError = ''; state.newItemDraft[phaseId] = {kind:'activity', text:''};
+            loadProgram(); loadState();
+          });
         });
       });
     });
@@ -1552,19 +1582,23 @@
         var phaseId = btn.getAttribute('data-addreviewer');
         var d = state.newReviewerDraft[phaseId] || {};
         if(!d.accountId || !d.traineeId) return;
-        apiPost('setReviewerAssignment', {phaseId:phaseId, traineeId:d.traineeId, reviewerAccountId:d.accountId}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not add reviewer'; render(); return; }
-          state.programError = ''; state.newReviewerDraft[phaseId] = {traineeId:'', accountId:''};
-          loadProgram();
+        withButtonBusy(btn, function(){
+          return apiPost('setReviewerAssignment', {phaseId:phaseId, traineeId:d.traineeId, reviewerAccountId:d.accountId}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not add reviewer'; render(); return; }
+            state.programError = ''; state.newReviewerDraft[phaseId] = {traineeId:'', accountId:''};
+            loadProgram();
+          });
         });
       });
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-removereviewer]'), function(btn){
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-removereviewer');
-        apiPost('removeReviewerAssignment', {assignmentId:id}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not remove'; render(); return; }
-          state.programError = ''; loadProgram();
+        withButtonBusy(btn, function(){
+          return apiPost('removeReviewerAssignment', {assignmentId:id}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not remove'; render(); return; }
+            state.programError = ''; loadProgram();
+          });
         });
       });
     });
@@ -1588,11 +1622,13 @@
       createPhaseBtn.addEventListener('click', function(){
         var d = state.newPhaseDraft;
         if(!d.title || !d.title.trim() || !state.programTrackFilter) return;
-        apiPost('createPhase', {title:d.title.trim(), trackId:state.programTrackFilter, tag:d.tag, range:d.range, location:d.location, reviewerAccountIds:d.reviewerAccountIds||[], output:d.output, objective:d.objective}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not create'; render(); return; }
-          state.programError = '';
-          state.newPhaseDraft = {title:'', tag:'', range:'', location:'', reviewerAccountIds:[], output:'', objective:'', trackId:state.programTrackFilter};
-          loadProgram(); loadState();
+        withButtonBusy(createPhaseBtn, function(){
+          return apiPost('createPhase', {title:d.title.trim(), trackId:state.programTrackFilter, tag:d.tag, range:d.range, location:d.location, reviewerAccountIds:d.reviewerAccountIds||[], output:d.output, objective:d.objective}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not create'; render(); return; }
+            state.programError = '';
+            state.newPhaseDraft = {title:'', tag:'', range:'', location:'', reviewerAccountIds:[], output:'', objective:'', trackId:state.programTrackFilter};
+            loadProgram(); loadState();
+          });
         });
       });
     }
@@ -1614,11 +1650,13 @@
       createTrackBtn.addEventListener('click', function(){
         var d = state.newTrackDraft;
         if(!d.name || !d.name.trim()) return;
-        apiPost('createTrack', {name:d.name.trim(), description:d.description}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not create track'; render(); return; }
-          state.programError = '';
-          state.newTrackDraft = {name:'', description:''};
-          loadProgram();
+        withButtonBusy(createTrackBtn, function(){
+          return apiPost('createTrack', {name:d.name.trim(), description:d.description}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not create track'; render(); return; }
+            state.programError = '';
+            state.newTrackDraft = {name:'', description:''};
+            loadProgram();
+          });
         });
       });
     }
@@ -1634,9 +1672,11 @@
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-savetrack');
         var d = state.trackDrafts[id] || {};
-        apiPost('updateTrack', {trackId:id, name:d.name, description:d.description}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
-          state.programError = ''; loadProgram();
+        withButtonBusy(btn, function(){
+          return apiPost('updateTrack', {trackId:id, name:d.name, description:d.description}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not save'; render(); return; }
+            state.programError = ''; loadProgram();
+          });
         });
       });
     });
@@ -1644,11 +1684,13 @@
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-deletetrack');
         if(!confirm('Delete this track? It must have no Key Objectives and no employees on it.')) return;
-        apiPost('deleteTrack', {trackId:id}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not delete track'; render(); return; }
-          delete state.trackDrafts[id];
-          if(state.programTrackFilter===id) state.programTrackFilter = '';
-          state.programError = ''; loadProgram();
+        withButtonBusy(btn, function(){
+          return apiPost('deleteTrack', {trackId:id}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not delete track'; render(); return; }
+            delete state.trackDrafts[id];
+            if(state.programTrackFilter===id) state.programTrackFilter = '';
+            state.programError = ''; loadProgram();
+          });
         });
       });
     });
@@ -1661,12 +1703,33 @@
         var traineeId = btn.getAttribute('data-savetraineetrack');
         var trackId = state.traineeTrackDrafts[traineeId];
         if(!trackId) return;
-        apiPost('setTraineeTrack', {traineeId:traineeId, trackId:trackId}).then(function(res){
-          if(!res.ok){ state.programError = res.error || 'Could not reassign'; render(); return; }
-          state.programError = ''; loadProgram(); loadState();
+        withButtonBusy(btn, function(){
+          return apiPost('setTraineeTrack', {traineeId:traineeId, trackId:trackId}).then(function(res){
+            if(!res.ok){ state.programError = res.error || 'Could not reassign'; render(); return; }
+            state.programError = ''; loadProgram(); loadState();
+          });
         });
       });
     });
+  }
+
+  // Shows a spinner and disables `btn` for the duration of an async action,
+  // so a click that triggers a network call (login, create/save/delete in
+  // Manage Accounts or Manage Program) gives immediate feedback instead of
+  // silently sitting there — which is what was leading to accidental
+  // double-submits (e.g. creating the same account twice). `run` must
+  // return the Promise doing the work; the button is restored to its
+  // original state once it settles, whether it succeeds or fails. A second
+  // click while already busy is a no-op.
+  function withButtonBusy(btn, run){
+    if(!btn || btn.disabled) return;
+    var original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>' + original;
+    var restore = function(){ btn.disabled = false; btn.innerHTML = original; };
+    var result = run();
+    if(result && typeof result.then === 'function'){ result.then(restore, restore); }
+    else { restore(); }
   }
 
   function bindClick(sel, attr, fn){
