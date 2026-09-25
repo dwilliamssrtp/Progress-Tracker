@@ -469,6 +469,20 @@
     }
   }
 
+  // Bumped on every loadState() call; a response only gets applied if it's
+  // still the most recently *issued* one when it resolves. Without this, a
+  // slow-to-resolve earlier request (e.g. a background poll fired while on
+  // Team Roster, whose response carries every phase across every Track)
+  // can land AFTER a newer, correctly-scoped request the user's next click
+  // already triggered (e.g. opening one specific employee), clobbering the
+  // right data with the stale one. That's what made a freshly created Key
+  // Objective appear to show the wrong employee's/Track's objectives for a
+  // stretch before "fixing itself" on the next poll — not backend latency,
+  // a genuine out-of-order response race. Every field a response writes
+  // into state (phases, items, trainee, roster, reviewersByPhase) is
+  // gated on this, not just the view (see the mode branches below).
+  var loadSeq = 0;
+
   function loadState(){
     if(!apiConfigured()){
       if(!state.loaded){
@@ -488,7 +502,9 @@
     var params = {};
     if(state.view==='trainee' && state.activeTraineeId){ params.traineeId = state.activeTraineeId; }
 
+    var mySeq = ++loadSeq;
     apiGet(params).then(function(res){
+      if(mySeq !== loadSeq) return; // superseded by a newer loadState() call — discard
       if(!res.ok){
         if(res.error==='auth'){ clearAuth(); render(); return; }
         state.offline = true; render(); return;
@@ -528,7 +544,7 @@
       }
       ensureActivePhase();
       render();
-    }).catch(function(){ state.offline = true; render(); });
+    }).catch(function(){ if(mySeq !== loadSeq) return; state.offline = true; render(); });
   }
 
   function applyFetchedItems(rows){
