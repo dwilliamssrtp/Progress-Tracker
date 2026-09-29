@@ -257,7 +257,6 @@
      page still shows something real when opened. */
   var API_URL = 'https://script.google.com/macros/s/AKfycbycNP1fIScDrUBtPU8mU1TufHomYGjxaIA7KOxh-TIn-pMMzl9X9QaIYlSmXgoK1CNlIA/exec';
   var POLL_MS = 15000;
-  var PDF_URL = './CDP-001.pdf';
   var LOGO_URL = './assets/logo.png';
 
   // Key Objectives (formerly a hardcoded "phases" list) are now admin-owned
@@ -760,7 +759,6 @@
         '<div class="doctitle">Career Development Plan</div>' +
         '<div class="docmeta">' +
           '<span>Doc CDP-001 &middot; Rev 01</span>' +
-          '<a href="'+PDF_URL+'" target="_blank" rel="noopener">View CDP-001 PDF</a>' +
           (state.view==='trainee' && state.activeTraineeId ? '<span id="backToRosterBtn" class="linklike">&larr; back to roster</span>' : '') +
           (state.view==='trainee' && state.activeTraineeId && canManageActiveTrainee() ? '<span id="programInfoBtn" class="linklike">edit employee info</span>' : '') +
           (acc.traineeId && !(state.view==='trainee' && state.activeTraineeId===acc.traineeId) ? '<span id="myDevBtn" class="linklike">my development</span>' : '') +
