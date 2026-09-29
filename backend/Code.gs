@@ -445,12 +445,20 @@ function requireAdmin_(acc) {
 
 function tracksList_() {
   return sheetToObjects_(getTracksSheet_(), TRACK_HEADERS).map(function (t) {
-    return { id: t.TrackId, name: t.Name, description: t.Description };
+    return { id: String(t.TrackId), name: t.Name, description: t.Description };
   });
 }
 
 // Key Objectives, optionally filtered to one Track. Pass no trackId to get
 // every objective across every Track (used by the admin Manage Program view).
+//
+// Every id-like field here is explicitly String(...)-wrapped. Google Sheets
+// silently returns a purely-numeric cell's value as a JS Number rather than
+// a string (e.g. a PhaseId of "2" comes back as the number 2) while an
+// alphanumeric one like "1a" stays a string — so without this, the front
+// end's `phase.id === state.activePhase` checks would fail specifically for
+// numeric-looking ids (mismatched types even though the value "looks" the
+// same), silently breaking navigation to just those objectives.
 function phasesList_(trackId) {
   var rows = sheetToObjects_(getPhasesSheet_(), PHASE_HEADERS);
   if (trackId) rows = rows.filter(function (p) { return String(p.TrackId) === String(trackId); });
@@ -458,7 +466,7 @@ function phasesList_(trackId) {
     .sort(function (a, b) { return (a.Order || 0) - (b.Order || 0); })
     .map(function (p) {
       return {
-        id: p.PhaseId, trackId: p.TrackId, tag: p.Tag, title: p.Title, range: p.RangeLabel, location: p.Location,
+        id: String(p.PhaseId), trackId: String(p.TrackId || ''), tag: p.Tag, title: p.Title, range: p.RangeLabel, location: p.Location,
         reporting: p.ReportingLabel, output: p.Output, objective: p.ObjectiveText, order: p.Order
       };
     });
@@ -471,15 +479,23 @@ function phasesForTrainee_(traineeId) {
   return phasesList_(t ? t.TrackId : '');
 }
 
+// Same numeric-coercion hazard as phasesList_ above: ItemId/Phase must stay
+// strings even when their sheet text is purely numeric.
 function itemDefsList_() {
   return sheetToObjects_(getItemDefsSheet_(), ITEMDEF_HEADERS)
-    .sort(function (a, b) { return (a.Order || 0) - (b.Order || 0); });
+    .sort(function (a, b) { return (a.Order || 0) - (b.Order || 0); })
+    .map(function (d) { return Object.assign({}, d, { ItemId: String(d.ItemId), Phase: String(d.Phase) }); });
 }
 
 /* ---------------- review hierarchy ---------------- */
 
 function reviewerAssignments_() {
-  return sheetToObjects_(getReviewersSheet_(), REVIEWER_HEADERS);
+  return sheetToObjects_(getReviewersSheet_(), REVIEWER_HEADERS).map(function (r) {
+    return Object.assign({}, r, {
+      AssignmentId: String(r.AssignmentId), PhaseId: String(r.PhaseId),
+      TraineeId: r.TraineeId ? String(r.TraineeId) : '', ReviewerAccountId: String(r.ReviewerAccountId)
+    });
+  });
 }
 
 // Reviewer account ids for a phase, resolved for a specific employee:
@@ -566,8 +582,15 @@ function seedItemsForTrainee_(traineeId, trackId) {
   if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, ITEM_HEADERS.length).setValues(rows);
 }
 
+// ItemId/Phase/TraineeId are explicitly stringified for the same reason as
+// phasesList_ above — this is what the front end's itemsForPhase() groups
+// checklist items by phase id against, so a numeric-looking Phase value
+// (e.g. the seed objectives "2"/"3") must come back as a string like every
+// other id, not a JS Number Google Sheets silently coerced it into.
 function itemsForTrainee_(traineeId) {
-  return sheetToObjects_(getItemsSheet_(), ITEM_HEADERS).filter(function (r) { return String(r.TraineeId) === String(traineeId); });
+  return sheetToObjects_(getItemsSheet_(), ITEM_HEADERS)
+    .filter(function (r) { return String(r.TraineeId) === String(traineeId); })
+    .map(function (r) { return Object.assign({}, r, { TraineeId: String(r.TraineeId), ItemId: String(r.ItemId), Phase: String(r.Phase) }); });
 }
 
 function findItemRow_(sheet, traineeId, itemId) {
@@ -609,8 +632,8 @@ function rosterList_(trainees) {
   return trainees.map(function (t) {
     var c = traineeCounts_(t.TraineeId);
     return {
-      traineeId: t.TraineeId, name: t.Name, startDate: t.StartDate, status: t.Status,
-      trackId: t.TrackId || '', trackName: trackNameById[t.TrackId] || '',
+      traineeId: String(t.TraineeId), name: t.Name, startDate: t.StartDate, status: t.Status,
+      trackId: t.TrackId ? String(t.TrackId) : '', trackName: trackNameById[t.TrackId] || '',
       total: c.total, approved: c.approved, submitted: c.submitted
     };
   });
@@ -654,7 +677,7 @@ function doGet(e) {
       var myPhases = phasesForTrainee_(acc.TraineeId);
       return json_({
         ok: true, mode: 'trainee', account: publicAccount_(acc),
-        trainee: trainee ? { traineeId: trainee.TraineeId, name: trainee.Name, startDate: trainee.StartDate, trackId: trainee.TrackId || '' } : null,
+        trainee: trainee ? { traineeId: String(trainee.TraineeId), name: trainee.Name, startDate: trainee.StartDate, trackId: trainee.TrackId ? String(trainee.TrackId) : '' } : null,
         items: itemsForTrainee_(acc.TraineeId),
         phases: myPhases,
         reviewersByPhase: reviewersByPhaseFor_(acc.TraineeId, myPhases)
@@ -673,7 +696,7 @@ function doGet(e) {
       return json_({
         ok: true, mode: 'detail', account: publicAccount_(acc),
         isOwn: !!acc.TraineeId && String(requestedTraineeId) === String(acc.TraineeId),
-        trainee: { traineeId: t2.TraineeId, name: t2.Name, startDate: t2.StartDate, trackId: t2.TrackId || '' },
+        trainee: { traineeId: String(t2.TraineeId), name: t2.Name, startDate: t2.StartDate, trackId: t2.TrackId ? String(t2.TrackId) : '' },
         items: itemsForTrainee_(requestedTraineeId),
         phases: theirPhases,
         reviewersByPhase: reviewersByPhaseFor_(requestedTraineeId, theirPhases)
@@ -773,11 +796,21 @@ function handleChangePassword_(acc, body) {
 
 /* ---------------- admin actions: accounts ---------------- */
 
+// TraineeId/TrackId are always generated with a letter prefix (newId_(),
+// or the literal 'track_default'), so in practice these never hit the
+// bare-numeric Sheets coercion phasesList_ guards against — stringified
+// anyway so a manually-edited id in the sheet can never cause the same
+// silent id-mismatch bug elsewhere.
+function traineesPublic_() {
+  return sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS).map(function (t) {
+    return Object.assign({}, t, { TraineeId: String(t.TraineeId), TrackId: t.TrackId ? String(t.TrackId) : '' });
+  });
+}
+
 function handleListAccounts_(acc, body) {
   requireAdmin_(acc);
   var accounts = sheetToObjects_(getAccountsSheet_(), ACCOUNT_HEADERS).map(publicAccount_);
-  var trainees = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS);
-  return json_({ ok: true, accounts: accounts, trainees: trainees, tracks: tracksList_() });
+  return json_({ ok: true, accounts: accounts, trainees: traineesPublic_(), tracks: tracksList_() });
 }
 
 function handleCreateAccount_(acc, body) {
@@ -897,7 +930,6 @@ function handleDeleteAccount_(acc, body) {
 function handleListProgram_(acc, body) {
   requireAdmin_(acc);
   var accounts = sheetToObjects_(getAccountsSheet_(), ACCOUNT_HEADERS).map(publicAccount_);
-  var trainees = sheetToObjects_(getTraineesSheet_(), TRAINEE_HEADERS);
   return json_({
     ok: true,
     tracks: tracksList_(),
@@ -905,7 +937,7 @@ function handleListProgram_(acc, body) {
     itemDefs: itemDefsList_(),
     reviewerAssignments: reviewerAssignments_(),
     accounts: accounts,
-    trainees: trainees
+    trainees: traineesPublic_()
   });
 }
 
